@@ -26,8 +26,6 @@ import userRoutes from "./routes/userRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import sectionRoutes from "./routes/sectionRoutes.js";
-import lessonRoutes from "./routes/lessonRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
 database();
