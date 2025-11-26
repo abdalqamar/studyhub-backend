@@ -561,8 +561,8 @@ const getCoursePreview = async (req, res) => {
       message: "Course preview fetched successfully",
       course: {
         _id: course._id,
-        title: course.courseName,
-        description: course.courseDescription,
+        title: course.title,
+        description: course.description,
         whatYouWillLearn: course.whatYouWillLearn,
         requirements: course.requirements,
         category: course.category,
