@@ -1,4 +1,4 @@
-exports.paymentSuccessEmail = (name, amount, orderId, paymentId) => {
+const enrollmentEmailTemplate = (name, amount, orderId, paymentId) => {
   return `<!DOCTYPE html>
       <html>
       
@@ -83,3 +83,4 @@ exports.paymentSuccessEmail = (name, amount, orderId, paymentId) => {
       
       </html>`;
 };
+export default enrollmentEmailTemplate;

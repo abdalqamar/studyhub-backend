@@ -1,13 +1,23 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import database from "./config/db.js";
-dotenv.config();
+import paymentRoutes from "./routes/paymentRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import courseRoutes from "./routes/courseRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 const app = express();
 
-// CORS configuration
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
+app.use(cookieParser());
+
+// CORS setup
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
@@ -15,34 +25,23 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
-app.use(cookieParser());
-
-const PORT = process.env.PORT;
-
-import userRoutes from "./routes/userRoutes.js";
-import courseRoutes from "./routes/courseRoutes.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
-import authRoutes from "./routes/authRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
-
+// Database connection
 database();
 
+// Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/courses", courseRoutes);
-app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/admin", adminRoutes);
-// app.use("/api/v1/instructor", adminRoutes);
+app.use("/api/v1/payment", paymentRoutes);
 
 app.get("/", (_, res) => {
-  res.send("Hello from Node.js ");
+  res.send("Hello from StudyHub");
 });
 
 // Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running in http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
