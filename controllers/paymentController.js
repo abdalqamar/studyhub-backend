@@ -170,8 +170,10 @@ const razorpayWebhook = async (req, res) => {
     }
 
     return res.status(200).json({ success: true });
-  } catch {
-    return res.status(500).json({ success: false });
+  } catch (error) {
+    console.log(error);
+    console.error("WEBHOOK ERROR:", error);
+    return res.status(500).json({ success: false, message: "webhook error" });
   }
 };
 
