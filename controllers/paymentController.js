@@ -60,7 +60,13 @@ const createOrder = async (req, res) => {
 };
 
 const razorpayWebhook = async (req, res) => {
-  console.log("WEBHOOK HIT");
+  console.log("=== WEBHOOK HIT ===");
+  console.log("Timestamp:", new Date().toISOString());
+  console.log("Method:", req.method);
+  console.log("URL:", req.url);
+  console.log("Headers:", JSON.stringify(req.headers, null, 2));
+  console.log("Body type:", typeof req.body);
+  console.log("Body is Buffer:", Buffer.isBuffer(req.body));
   console.log("All headers:", req.headers);
 
   try {
