@@ -61,128 +61,114 @@ const createOrder = async (req, res) => {
 
 const razorpayWebhook = async (req, res) => {
   try {
-    // Verify Razorpay webhook secret
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-
-    const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(req.body.toString());
-    const digest = shasum.digest("hex");
-
     const signature = req.headers["x-razorpay-signature"];
 
-    if (digest !== signature) {
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(req.body)
+      .digest("hex");
+
+    if (expected !== signature) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid signature" });
     }
 
-    console.log("Webhook verified:", req.body.event);
+    const { event, payload } = JSON.parse(req.body);
 
-    const event = req.body.event;
-    const payload = req.body.payload;
-
-    // Only handle successful payments
     if (event === "payment.captured") {
       const payment = payload.payment.entity;
 
-      const notes = payment.notes;
-      const userId = notes.userId;
-      const courseIds = JSON.parse(notes.courseIds);
-
-      console.log("Enroll User:", userId, "Courses:", courseIds);
-
-      const user = await User.findById(userId);
-      if (!user) {
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found" });
-      }
-
-      // Enroll user in selected courses
-      for (let cid of courseIds) {
-        if (!user.enrolledCourses.includes(cid)) {
-          user.enrolledCourses.push(cid);
-
-          await Course.findByIdAndUpdate(
-            cid,
-            { $push: { enrolledStudents: userId } },
-            { new: true }
-          );
-        }
-      }
-
-      await user.save();
-
-      console.log("Enrollment success!");
-
-      // Send payment confirmation email
+      let userId, courseIds;
       try {
-        const htmlBody = enrollmentEmailTemplate(
-          user.name,
-          payment.amount / 100,
-          payment.order_id,
-          payment.id
+        userId = payment.notes.userId;
+        courseIds = JSON.parse(payment.notes.courseIds);
+      } catch {
+        return res.status(400).json({ message: "Invalid notes format" });
+      }
+
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        const user = await User.findById(userId).session(session);
+        if (!user) throw new Error("User not found");
+
+        const courses = await Course.find({ _id: { $in: courseIds } }).session(
+          session
         );
 
-        await sendEmail(
-          user.email,
-          "Course Payment Confirmation - StudyHub",
-          htmlBody
+        const enrolledTitles = [];
+
+        await Promise.all(
+          courses.map((c) => {
+            enrolledTitles.push(c.title);
+            return Course.findByIdAndUpdate(
+              c._id,
+              { $push: { enrolledStudents: userId } },
+              { new: true, session }
+            );
+          })
         );
 
-        console.log("Email sent successfully");
-      } catch (emailError) {
-        console.log("Email sending failed:", emailError);
+        user.enrolledCourses.push(...courseIds);
+        await user.save({ session });
+
+        await session.commitTransaction();
+
+        (async () => {
+          try {
+            const htmlBody = enrollmentEmailTemplate(
+              user.name,
+              payment.amount / 100,
+              payment.order_id,
+              payment.id,
+              enrolledTitles
+            );
+
+            await sendEmail(
+              user.email,
+              "Course Purchase & Enrollment Confirmation - StudyHub",
+              htmlBody
+            );
+          } catch {}
+        })();
+
+        return res.status(200).json({ success: true });
+      } catch (err) {
+        await session.abortTransaction();
+        return res.status(500).json({ success: false });
+      }
+    }
+
+    if (event === "payment.failed") {
+      const payment = payload.payment.entity;
+      const user = await User.findById(payment.notes.userId);
+
+      if (user) {
+        (async () => {
+          const reason =
+            payment.error_description ||
+            payment.error_reason ||
+            "Payment processing failed";
+
+          const htmlBody = paymentFailedEmailTemplate(
+            user.name,
+            payment.amount / 100,
+            payment.order_id,
+            reason
+          );
+
+          await sendEmail(user.email, "Payment Failed - StudyHub", htmlBody);
+        })();
       }
 
       return res.status(200).json({ success: true });
     }
 
-    if (event === "payment.failed") {
-      const payment = payload.payment.entity;
-      const notes = payment.notes;
-
-      if (notes && notes.userId) {
-        const userId = notes.userId;
-        const user = await User.findById(userId);
-
-        if (user) {
-          console.log(` Payment failed for User: ${user.email}`);
-
-          // Send payment failed email
-          try {
-            const failureReason =
-              payment.error_description || "Payment processing failed";
-
-            const htmlBody = paymentFailedEmailTemplate(
-              user.name,
-              payment.amount / 100,
-              payment.order_id,
-              failureReason
-            );
-
-            await sendEmail(user.email, "Payment Failed - StudyHub", htmlBody);
-
-            console.log(" Payment failure email sent to:", user.email);
-          } catch (emailError) {
-            console.error("Failed email sending error:", emailError.message);
-          }
-        }
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Payment failure recorded",
-      });
-    }
-
-    // Acknowledge other events
-    return res.status(200).json({
-      success: true,
-      message: "Event received",
-    });
-  } catch (error) {
-    console.error("Webhook error:", error);
+    return res.status(200).json({ success: true });
+  } catch {
     return res.status(500).json({ success: false });
   }
 };
