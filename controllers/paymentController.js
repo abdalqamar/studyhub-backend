@@ -66,18 +66,32 @@ const razorpayWebhook = async (req, res) => {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     const signature = req.headers["x-razorpay-signature"];
 
+    // Verify secret exists
+    if (!secret) {
+      console.error("RAZORPAY_WEBHOOK_SECRET not configured");
+      return res
+        .status(500)
+        .json({ success: false, message: "Server configuration error" });
+    }
+
+    const rawBody = req.body.toString("utf8");
+
     const expected = crypto
       .createHmac("sha256", secret)
-      .update(req.body)
+      .update(rawBody)
       .digest("hex");
 
     if (expected !== signature) {
+      console.log("Signature verification failed");
+      console.log("Expected:", expected);
+      console.log("Received:", signature);
       return res
         .status(400)
         .json({ success: false, message: "Invalid signature" });
     }
 
-    const { event, payload } = JSON.parse(req.body);
+    // Parse the JSON after verification
+    const { event, payload } = JSON.parse(rawBody);
 
     if (event === "payment.captured") {
       const payment = payload.payment.entity;
@@ -86,40 +100,75 @@ const razorpayWebhook = async (req, res) => {
       try {
         userId = payment.notes.userId;
         courseIds = JSON.parse(payment.notes.courseIds);
-      } catch {
-        return res.status(400).json({ message: "Invalid notes format" });
+
+        // Validate data
+        if (!userId || !Array.isArray(courseIds) || courseIds.length === 0) {
+          throw new Error("Invalid notes data");
+        }
+      } catch (err) {
+        console.error("Notes parsing error:", err);
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid notes format" });
       }
 
       const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
+        // Find user
         const user = await User.findById(userId).session(session);
-        if (!user) throw new Error("User not found");
+        if (!user) {
+          throw new Error("User not found");
+        }
 
+        // Find courses and validate they all exist
         const courses = await Course.find({ _id: { $in: courseIds } }).session(
           session
         );
 
+        if (courses.length !== courseIds.length) {
+          throw new Error("Some courses not found");
+        }
+
+        // Filter out courses user is already enrolled in
+        const newCourseIds = courseIds.filter(
+          (id) => !user.enrolledCourses.includes(id.toString())
+        );
+
+        if (newCourseIds.length === 0) {
+          console.log("User already enrolled in all courses");
+          await session.commitTransaction();
+          return res
+            .status(200)
+            .json({ success: true, message: "Already enrolled" });
+        }
+
         const enrolledTitles = [];
 
+        // Update courses with new enrollment
         await Promise.all(
           courses.map((c) => {
-            enrolledTitles.push(c.title);
-            return Course.findByIdAndUpdate(
-              c._id,
-              { $push: { enrolledStudents: userId } },
-              { new: true, session }
-            );
+            if (newCourseIds.includes(c._id.toString())) {
+              enrolledTitles.push(c.title);
+              return Course.findByIdAndUpdate(
+                c._id,
+                { $addToSet: { enrolledStudents: userId } }, // Use $addToSet to avoid duplicates
+                { new: true, session }
+              );
+            }
+            return Promise.resolve();
           })
         );
 
-        user.enrolledCourses.push(...courseIds);
+        // Add new courses to user's enrolled list
+        user.enrolledCourses.push(...newCourseIds);
         await user.save({ session });
 
         await session.commitTransaction();
 
-        (async () => {
+        // Send enrollment email (non-blocking)
+        setImmediate(async () => {
           try {
             const htmlBody = enrollmentEmailTemplate(
               user.name,
@@ -134,36 +183,55 @@ const razorpayWebhook = async (req, res) => {
               "Course Purchase & Enrollment Confirmation - StudyHub",
               htmlBody
             );
-          } catch {}
-        })();
+          } catch (emailError) {
+            console.error("Email send error:", emailError);
+          }
+        });
 
         return res.status(200).json({ success: true });
       } catch (err) {
         await session.abortTransaction();
-        return res.status(500).json({ success: false });
+        console.error("Transaction error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+      } finally {
+        session.endSession();
       }
     }
 
     if (event === "payment.failed") {
       const payment = payload.payment.entity;
-      const user = await User.findById(payment.notes.userId);
 
-      if (user) {
-        (async () => {
-          const reason =
-            payment.error_description ||
-            payment.error_reason ||
-            "Payment processing failed";
+      try {
+        const user = await User.findById(payment.notes.userId);
 
-          const htmlBody = paymentFailedEmailTemplate(
-            user.name,
-            payment.amount / 100,
-            payment.order_id,
-            reason
-          );
+        if (user) {
+          // Send failure email
+          setImmediate(async () => {
+            try {
+              const reason =
+                payment.error_description ||
+                payment.error_reason ||
+                "Payment processing failed";
 
-          await sendEmail(user.email, "Payment Failed - StudyHub", htmlBody);
-        })();
+              const htmlBody = paymentFailedEmailTemplate(
+                user.name,
+                payment.amount / 100,
+                payment.order_id,
+                reason
+              );
+
+              await sendEmail(
+                user.email,
+                "Payment Failed - StudyHub",
+                htmlBody
+              );
+            } catch (emailError) {
+              console.error("Email send error:", emailError);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error handling payment.failed event:", err);
       }
 
       return res.status(200).json({ success: true });
@@ -171,10 +239,8 @@ const razorpayWebhook = async (req, res) => {
 
     return res.status(200).json({ success: true });
   } catch (error) {
-    console.log(error);
     console.error("WEBHOOK ERROR:", error);
-    return res.status(500).json({ success: false, message: "webhook error" });
+    return res.status(500).json({ success: false, message: "Webhook error" });
   }
 };
-
 export { createOrder, razorpayWebhook };
