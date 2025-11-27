@@ -61,6 +61,7 @@ const createOrder = async (req, res) => {
 
 const razorpayWebhook = async (req, res) => {
   console.log("WEBHOOK HIT");
+  console.log("All headers:", req.headers);
 
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
