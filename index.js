@@ -11,6 +11,9 @@ import adminRoutes from "./routes/adminRoutes.js";
 
 const app = express();
 
+// webhook
+app.post("/api/v1/payment/webhook", express.raw({ type: "application/json" }));
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
