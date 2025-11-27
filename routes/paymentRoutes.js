@@ -6,11 +6,11 @@ import {
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
-router.post("/order", isAuthenticated, createOrder);
 router.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   razorpayWebhook
 );
+router.post("/order", isAuthenticated, createOrder);
 
 export default router;
