@@ -149,9 +149,15 @@ const getUserDetails = async (req, res) => {
 
 const getEnrolledCourses = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
-    // Find user + enrolled courses
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const user = await User.findById(userId).populate("enrolledCourses");
 
     if (!user) {
@@ -161,75 +167,82 @@ const getEnrolledCourses = async (req, res) => {
       });
     }
 
-    let coursesWithProgress = [];
+    const enrolledCourses = user.enrolledCourses;
 
-    for (let course of user.enrolledCourses) {
-      const fullCourse = await Course.findById(course._id)
-        .populate({
-          path: "courseContent",
-          populate: {
-            path: "lesson",
-            select: "title duration",
-          },
-        })
-        .populate({
-          path: "instructor",
-          select: "firstName lastName ",
-        })
-        .populate("category", "name")
-        .lean();
+    // Run all courses in parallel (faster)
+    const coursesWithProgress = await Promise.all(
+      enrolledCourses.map(async (course) => {
+        const fullCourse = await Course.findById(course._id)
+          .populate({
+            path: "courseContent",
+            populate: {
+              path: "lesson",
+              select: "title duration",
+            },
+          })
+          .populate({
+            path: "instructor",
+            select: "firstName lastName",
+          })
+          .populate("category", "name")
+          .lean();
 
-      // All lessons list
-      const allLessons = fullCourse.courseContent.flatMap(
-        (section) => section.lesson || []
-      );
+        if (!fullCourse) return null;
 
-      const totalLessons = allLessons.length;
+        const allLessons = fullCourse.courseContent.flatMap(
+          (section) => section.lesson || []
+        );
 
-      // Calculate Total Duration (in minutes)
-      const totalMinutes = allLessons.reduce(
-        (sum, lesson) => sum + (lesson?.duration || 0),
-        0
-      );
+        const totalLessons = allLessons.length;
 
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
+        const totalMinutes = allLessons.reduce(
+          (sum, lesson) => sum + (lesson?.duration || 0),
+          0
+        );
 
-      const totalDuration = `${hours}h ${minutes}m`;
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const totalDuration = `${hours}h ${minutes}m`;
 
-      // Check student progress
-      const progress = await CourseProgress.findOne({
-        userId,
-        id: course._id,
-      });
+        // FIX: progress query wrong earlier (id was wrong field)
+        const progress = await CourseProgress.findOne({
+          userId,
+          courseId: course._id,
+        });
 
-      const completed = progress?.completedLessons?.length || 0;
+        const completed = progress?.completedLessons?.length || 0;
 
-      const percentage = totalLessons
-        ? Math.round((completed / totalLessons) * 100)
-        : 0;
+        const percentage = totalLessons
+          ? Math.round((completed / totalLessons) * 100)
+          : 0;
 
-      // Final card data
-      coursesWithProgress.push({
-        _id: course._id,
-        thumbnail: course.thumbnail,
-        title: course.title,
-        description: course.description,
-        progressPercentage: percentage,
-        totalDuration,
-        totalLessons,
-        category: fullCourse.category.name,
-        instructor: `${fullCourse.instructor.firstName} ${fullCourse.instructor.lastName}`,
-      });
-    }
+        const instructorName = fullCourse.instructor
+          ? `${fullCourse.instructor.firstName || ""} ${
+              fullCourse.instructor.lastName || ""
+            }`.trim()
+          : "Instructor Info Missing";
+
+        return {
+          _id: course._id,
+          thumbnail: course.thumbnail,
+          title: course.title,
+          description: course.description,
+          progressPercentage: percentage,
+          totalDuration,
+          totalLessons,
+          category: fullCourse.category?.name || fullCourse.category,
+          instructor: instructorName,
+        };
+      })
+    );
 
     return res.status(200).json({
       success: true,
       message: "Enrolled courses fetched successfully",
-      coursesWithProgress,
+      coursesWithProgress: coursesWithProgress.filter(Boolean),
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch enrolled courses",
