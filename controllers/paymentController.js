@@ -5,6 +5,7 @@ import sendEmail from "../utils/sendEmail.js";
 import enrollmentEmailTemplate from "../template/enrollmentEmailTemplate.js";
 import paymentFailedEmailTemplate from "../template/paymentFailedEmailTemplate.js";
 import razorpay from "../config/razorpay.js";
+import mongoose from "mongoose";
 
 const createOrder = async (req, res) => {
   try {
