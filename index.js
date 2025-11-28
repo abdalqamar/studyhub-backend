@@ -8,12 +8,16 @@ import courseRoutes from "./routes/courseRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import { razorpayWebhook } from "./controllers/paymentController.js";
 
 const app = express();
 
 // webhook
-app.use("/api/v1/payment/webhook", express.raw({ type: "application/json" }));
-
+app.post(
+  "/api/v1/payment/webhook",
+  express.raw({ type: "application/json" }),
+  razorpayWebhook
+);
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

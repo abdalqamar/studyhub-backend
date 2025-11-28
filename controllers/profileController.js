@@ -3,7 +3,6 @@ import Profile from "../models/profileModal.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import CourseProgress from "../models/courseProgressModal.js";
 import Course from "../models/courseModal.js";
-import Category from "../models/categoryModal.js";
 
 const updateProfile = async (req, res) => {
   try {
@@ -204,7 +203,6 @@ const getEnrolledCourses = async (req, res) => {
         const minutes = totalMinutes % 60;
         const totalDuration = `${hours}h ${minutes}m`;
 
-        // FIX: progress query wrong earlier (id was wrong field)
         const progress = await CourseProgress.findOne({
           userId,
           courseId: course._id,
@@ -216,12 +214,6 @@ const getEnrolledCourses = async (req, res) => {
           ? Math.round((completed / totalLessons) * 100)
           : 0;
 
-        const instructorName = fullCourse.instructor
-          ? `${fullCourse.instructor.firstName || ""} ${
-              fullCourse.instructor.lastName || ""
-            }`.trim()
-          : "Instructor Info Missing";
-
         return {
           _id: course._id,
           thumbnail: course.thumbnail,
@@ -231,7 +223,9 @@ const getEnrolledCourses = async (req, res) => {
           totalDuration,
           totalLessons,
           category: fullCourse.category?.name || fullCourse.category,
-          instructor: instructorName,
+          instructor: `${fullCourse.instructor?.firstName || ""} ${
+            fullCourse.instructor?.lastName || ""
+          }`.trim(),
         };
       })
     );
@@ -239,7 +233,7 @@ const getEnrolledCourses = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Enrolled courses fetched successfully",
-      coursesWithProgress: coursesWithProgress.filter(Boolean),
+      courses: coursesWithProgress,
     });
   } catch (err) {
     console.error(err);
