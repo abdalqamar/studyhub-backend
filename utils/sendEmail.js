@@ -4,6 +4,8 @@ const sendEmail = async (email, subject, htmlBody) => {
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: process.env.SMTP_PORT === "465",
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -11,16 +13,16 @@ const sendEmail = async (email, subject, htmlBody) => {
     });
 
     const info = await transporter.sendMail({
-      from: `"StudyHub" <${process.env.SMTP_USER}>`,
+      from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
       to: email,
-      subject: subject,
+      subject,
       html: htmlBody,
     });
 
-    console.log("Email sent:", info);
+    console.log("Email sent:", info.messageId);
     return info;
   } catch (error) {
-    console.error(" Email send error:", error);
+    console.error("Email send error:", error);
     throw new Error("Email could not be sent.");
   }
 };
