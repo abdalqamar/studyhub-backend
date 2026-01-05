@@ -163,7 +163,7 @@ const passwordUpdateTemplate = (email, fullName) => {
         <div class="container">
             <div class="header">
                 <a href="https://studyHub-edtech-project.vercel.app">
-                    <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1759739371/StudyHub_Logo_a62jmn.png" alt="studyHub Logo">
+                    <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png">
                 </a>
                 <h1 class="header-title">Password Updated Successfully</h1>
             </div>

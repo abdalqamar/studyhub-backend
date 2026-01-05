@@ -139,8 +139,7 @@ const paymentFailedEmailTemplate = (name, amount, orderId, reason) => {
     <div class="container">
         <a href="https://studyHub-edtech-project.vercel.app">
             <img class="logo" 
-                 src="https://res.cloudinary.com/du7xquzsm/image/upload/v1763790305/studyHub_logo-removebg-preview_ai0ckr.png" 
-                 alt="StudyHub Logo" />
+               src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png">
         </a>
 
         <div class="error-icon">✗</div>

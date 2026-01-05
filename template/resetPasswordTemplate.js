@@ -233,7 +233,7 @@ const resetPasswordTemplate = (email, fullName, frontendUrl) => {
         <div class="container">
             <div class="header">
                
-                    <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1759739371/StudyHub_Logo_a62jmn.png" alt="studyHub Logo">
+                    <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png">
        
                 <h1 class="header-title">Reset Your Password</h1>
             </div>

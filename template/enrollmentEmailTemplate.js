@@ -205,7 +205,7 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
 <body>
     <div class="container">
         <div class="header">
-            <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1759739371/StudyHub_Logo_a62jmn.png" alt="StudyHub Logo">
+            <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png">
             <p class="header-title">Payment Successful!</p>
         </div>
 
