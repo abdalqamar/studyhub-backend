@@ -1,270 +1,235 @@
 const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
+  // format amount safely
+  const formattedAmount = Number(amount).toLocaleString("en-IN");
+
   const coursesList = courses
     .map(
-      (course) => `<li style="margin: 8px 0; text-align: left;">${course}</li>`
+      (course) => `
+        <li style="margin: 12px 0; padding-left: 5px; text-align: left; color: #333333;">
+          ${course}
+        </li>
+      `
     )
     .join("");
 
   return `<!DOCTYPE html>
 <html>
-
 <head>
-    <meta charset="UTF-8">
-    <title>Course Purchase & Enrollment Confirmation – StudyHub</title>
-    <style>
-        body {
-            background-color: #f5f5f5;
-            font-family: 'Arial', 'Helvetica', sans-serif;
-            font-size: 16px;
-            line-height: 1.6;
-            color: #333333;
-            margin: 0;
-            padding: 0;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Course Purchase & Enrollment Confirmation – StudyHub</title>
 
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
+  <style>
+    body {
+      background-color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333333;
+    }
 
-        .header {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            padding: 40px 20px;
-            text-align: center;
-        }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+    }
 
-        .logo {
-            max-width: 160px;
-            height: auto;
-            margin-bottom: 15px;
-            background-color: transparent;
-        }
+    .header {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      padding: 40px 20px;
+      text-align: center;
+    }
 
-        .header-title {
-            color: #ffffff;
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0;
-        }
+    .logo {
+      max-width: 180px;
+      margin-bottom: 20px;
+    }
 
-        .content {
-            padding: 40px 30px;
-        }
+    .header-title {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: bold;
+      margin: 0;
+    }
 
-        .success-badge {
-            background-color: #4caf50;
-            color: #ffffff;
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
+    .content {
+      padding: 40px 30px;
+    }
 
-        .greeting {
-            font-size: 20px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 20px;
-        }
+    .success-badge {
+      background-color: #10b981;
+      color: #ffffff;
+      display: inline-block;
+      padding: 10px 24px;
+      border-radius: 25px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
 
-        .message {
-            font-size: 16px;
-            color: #555555;
-            margin-bottom: 30px;
-            line-height: 1.6;
-        }
+    .greeting {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #1f2937;
+    }
 
-        .info-box {
-            background-color: #f9f9f9;
-            border-left: 4px solid #3b82f6;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
+    .message {
+      color: #4b5563;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
 
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #e0e0e0;
-        }
+    .info-box {
+      background-color: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 24px;
+      margin: 24px 0;
+    }
 
-        .info-row:last-child {
-            border-bottom: none;
-        }
+    .info-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
 
-        .info-label {
-            font-weight: bold;
-            color: #666666;
-        }
+    .info-row:last-child {
+      border-bottom: none;
+    }
 
-        .info-value {
-            color: #333333;
-            font-weight: 600;
-        }
+    .info-label {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 14px;
+    }
 
-        .amount {
-            color: #4caf50;
-            font-size: 20px;
-            font-weight: bold;
-        }
+    .info-value {
+      font-weight: 600;
+      color: #1f2937;
+      word-break: break-all;
+    }
 
-        .courses-section {
-            margin: 30px 0;
-        }
+    .amount {
+      color: #10b981;
+      font-size: 24px;
+    }
 
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #3b82f6;
-            padding-bottom: 10px;
-        }
+    .courses-section {
+      margin: 32px 0;
+    }
 
-        .courses-list {
-            background-color: #f9f9f9;
-            padding: 20px 25px;
-            border-radius: 5px;
-            margin: 0;
-        }
+    .courses-list {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 20px 20px 20px 40px;
+      border-radius: 8px;
+    }
 
-        .courses-list li {
-            color: #333333;
-            font-size: 15px;
-            line-height: 1.8;
-        }
+    .enrollment-banner {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      text-align: center;
+      padding: 32px 24px;
+      border-radius: 12px;
+      margin: 32px 0;
+    }
 
-        .enrollment-banner {
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-            color: #ffffff;
-            text-align: center;
-            padding: 25px;
-            border-radius: 8px;
-            margin: 30px 0;
-        }
+    .cta {
+      display: inline-block;
+      padding: 16px 48px;
+      background-color: #ffffff;
+      color: #2563eb;
+      text-decoration: none;
+      border-radius: 30px;
+      font-weight: 700;
+      margin-top: 24px;
+    }
 
-        .enrollment-banner h2 {
-            margin: 0 0 10px 0;
-            font-size: 22px;
-        }
+    .footer {
+      background-color: #f9fafb;
+      padding: 32px 30px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
 
-        .enrollment-banner p {
-            margin: 0;
-            font-size: 16px;
-        }
+    .support {
+      font-size: 14px;
+      color: #6b7280;
+    }
 
-        .cta {
-            display: inline-block;
-            padding: 15px 40px;
-            background-color: #3b82f6;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 25px;
-            transition: background-color 0.3s;
-        }
+    .support a {
+      color: #3b82f6;
+      font-weight: 600;
+      text-decoration: none;
+    }
 
-        .cta:hover {
-            background-color: #2563eb;
-        }
-
-        .footer {
-            background-color: #f5f5f5;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .support {
-            font-size: 14px;
-            color: #666666;
-            line-height: 1.6;
-        }
-
-        .support a {
-            color: #3b82f6;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        .divider {
-            height: 1px;
-            background-color: #e0e0e0;
-            margin: 30px 0;
-        }
-    </style>
+    @media only screen and (max-width: 600px) {
+      .content {
+        padding: 30px 20px;
+      }
+    }
+  </style>
 </head>
 
 <body>
-    <div class="container">
-        <div class="header">
-            <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png">
-            <p class="header-title">Payment Successful!</p>
-        </div>
-
-        <div class="content">
-            <div class="success-badge">✓ Purchase Confirmed</div>
-            
-            <div class="greeting">Dear ${name},</div>
-            
-            <div class="message">
-                Thank you for your purchase! Your payment has been successfully processed and your enrollment is now complete.
-            </div>
-
-            <div class="info-box">
-                <div class="info-row">
-                    <span class="info-label">Amount Paid:</span>
-                    <span class="info-value amount">₹${amount}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Order ID:</span>
-                    <span class="info-value">${orderId}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Payment ID:</span>
-                    <span class="info-value">${paymentId}</span>
-                </div>
-            </div>
-
-            <div class="courses-section">
-                <div class="section-title">📚 Your Enrolled Courses</div>
-                <ul class="courses-list">
-                    ${coursesList}
-                </ul>
-            </div>
-
-            <div class="enrollment-banner">
-                <h2>🎉 You Are Now Enrolled!</h2>
-                <p>You can start learning immediately. Access your courses anytime, anywhere.</p>
-            </div>
-
-            <div style="text-align: center;">
-                <a href="https://studyHub-edtech-project.vercel.app/dashboard" class="cta">Start Learning Now</a>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="message" style="font-size: 14px; color: #666666;">
-                All your courses are now available in your dashboard. Happy learning! 🚀
-            </div>
-        </div>
-
-        <div class="footer">
-            <div class="support">
-                If you have any questions or need assistance, please feel free to reach out to us at 
-                <a href="mailto:info@studyHub.com">info@studyHub.com</a>. We are here to help!
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png" alt="StudyHub Logo" />
+      <p class="header-title">Payment Successful!</p>
     </div>
-</body>
 
+    <div class="content">
+      <div class="success-badge">✓ Purchase Confirmed</div>
+
+      <div class="greeting">Dear ${name},</div>
+
+      <div class="message">
+        Thank you for your purchase! Your payment has been successfully processed and your enrollment is now complete.
+      </div>
+
+      <div class="info-box">
+        <div class="info-row">
+          <div class="info-label">Amount Paid</div>
+          <div class="info-value amount">₹${formattedAmount}</div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-label">Order ID</div>
+          <div class="info-value">${orderId}</div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-label">Payment ID</div>
+          <div class="info-value">${paymentId}</div>
+        </div>
+      </div>
+
+      <div class="courses-section">
+        <h3>📚 Your Enrolled Courses</h3>
+        <ul class="courses-list">
+          ${coursesList}
+        </ul>
+      </div>
+
+      <div class="enrollment-banner">
+        <h2>🎉 You Are Now Enrolled!</h2>
+        <p>You can start learning immediately. Access your courses anytime, anywhere.</p>
+      </div>
+
+      <div style="text-align:center;">
+        <a href="https://studyhub-edtech-project.vercel.app/dashboard" class="cta">
+          Start Learning Now →
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="support">
+        Need help? Contact us at
+        <a href="mailto:info@studyhubedu.online">info@studyhubedu.online</a>
+      </div>
+    </div>
+  </div>
+</body>
 </html>`;
 };
 
