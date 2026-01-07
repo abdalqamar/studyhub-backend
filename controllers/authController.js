@@ -175,12 +175,12 @@ const login = async (req, res) => {
     }
 
     await user.save();
+    const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: "None",
-      path: "/",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -445,12 +445,11 @@ const refreshToken = async (req, res) => {
       user.refreshTokens = user.refreshTokens.slice(-3);
     }
     await user.save();
-
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("refreshToken", newToken.refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: "None",
-      path: "/",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
