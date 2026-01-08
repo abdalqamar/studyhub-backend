@@ -9,7 +9,7 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import { razorpayWebhook } from "./controllers/paymentController.js";
-import corsOptions from "./config/cors.js";
+import corsConfig from "./config/cors.js";
 
 const app = express();
 
@@ -26,7 +26,8 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 // CORS setup
-app.use(cors(corsOptions));
+app.use(cors(corsConfig));
+//
 
 // Database connection
 database();

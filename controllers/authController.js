@@ -177,11 +177,13 @@ const login = async (req, res) => {
     await user.save();
     const isProd = process.env.NODE_ENV === "production";
 
-    res.cookie("refreshToken", refreshToken, {
+    res.cookie("refreshToken", token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: isProd ? "strict" : "lax",
+      domain: isProd ? ".studyhubedu.online" : undefined,
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     return res.status(200).json({
@@ -445,12 +447,16 @@ const refreshToken = async (req, res) => {
       user.refreshTokens = user.refreshTokens.slice(-3);
     }
     await user.save();
+
     const isProd = process.env.NODE_ENV === "production";
-    res.cookie("refreshToken", newToken.refreshToken, {
+
+    res.cookie("refreshToken", token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: isProd ? "strict" : "lax",
+      domain: isProd ? ".studyhubedu.online" : undefined,
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     return res.status(200).json({
