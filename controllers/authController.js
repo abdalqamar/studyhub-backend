@@ -177,13 +177,13 @@ const login = async (req, res) => {
     await user.save();
     const isProd = process.env.NODE_ENV === "production";
 
-    res.cookie("refreshToken", token, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? "strict" : "lax",
       domain: isProd ? ".studyhubedu.online" : undefined,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({
@@ -450,15 +450,14 @@ const refreshToken = async (req, res) => {
 
     const isProd = process.env.NODE_ENV === "production";
 
-    res.cookie("refreshToken", token, {
+    res.cookie("refreshToken", newToken.refreshToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? "strict" : "lax",
       domain: isProd ? ".studyhubedu.online" : undefined,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-
     return res.status(200).json({
       success: true,
       message: "Token refreshed successfully",
