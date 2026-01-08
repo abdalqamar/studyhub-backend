@@ -6,9 +6,9 @@ const allowedOrigins = process.env.CORS_ORIGINS
 
 const isProd = process.env.NODE_ENV === "production";
 
-// Local dev me localhost allow
+// Local dev me localhost allowance
 if (!isProd) {
-  allowedOrigins.push("http://localhost:5173");
+  allowedOrigins.push("http://localhost:5173", "http://localhost:5000");
 }
 
 export default {
