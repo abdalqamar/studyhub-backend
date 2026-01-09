@@ -18,15 +18,18 @@ const sendOtp = async (req, res) => {
         message: "Email is required",
       });
     }
+
     const existUser = await User.findOne({ email });
     if (existUser) {
       return res.status(401).json({
         success: false,
-        message: "user already registered",
+        message: "User already registered",
       });
     }
+
     const lastOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
     const OTP_INTERVAL = 60 * 1000;
+
     if (lastOtp && Date.now() - lastOtp.createdAt.getTime() < OTP_INTERVAL) {
       const waitTime = Math.ceil(
         (OTP_INTERVAL - (Date.now() - lastOtp.createdAt.getTime())) / 1000
@@ -36,11 +39,16 @@ const sendOtp = async (req, res) => {
         message: `Please wait ${waitTime} seconds before requesting a new OTP.`,
       });
     }
+
     const { otp } = await generateUniqueOTP(email);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(` OTP for ${email}: ${otp}`);
+    }
+
     res.status(200).json({
       success: true,
-      message: "OTP Sent Successfully",
-      otp,
+      message: "OTP sent to your email",
     });
   } catch (error) {
     console.error("Send OTP Error", error);
@@ -396,60 +404,53 @@ const changePassword = async (req, res) => {
 const refreshToken = async (req, res) => {
   try {
     const { refreshToken: refreshTokenCookie } = req.cookies;
+    if (!refreshTokenCookie)
+      return res
+        .status(401)
+        .json({ success: false, message: "Refresh token not provided" });
 
-    if (!refreshTokenCookie) {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token not provided",
-      });
-    }
-
-    // Verify refresh token
     let decoded;
     try {
       decoded = jwt.verify(refreshTokenCookie, process.env.JWT_REFRESH_SECRET);
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired refresh token",
-      });
+    } catch {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid or expired refresh token" });
     }
 
-    // Find user and validate refresh token
     const user = await User.findById(decoded.id);
     if (
       !user ||
-      !user.refreshTokens.some(
-        (tokenObj) => tokenObj.token === refreshTokenCookie
-      )
-    ) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid refresh token",
-      });
-    }
+      !user.refreshTokens.some((t) => t.token === refreshTokenCookie)
+    )
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid refresh token" });
 
-    // Generate new tokens
     const newToken = generateTokens({
       id: user._id,
       email: user.email,
       role: user.role,
     });
 
-    user.refreshTokens = user.refreshTokens.filter(
-      (tokenObj) => tokenObj.token !== refreshTokenCookie
+    //  update user's refresh tokens in DB
+    await User.updateOne(
+      { _id: user._id },
+      { $pull: { refreshTokens: { token: refreshTokenCookie } } }
     );
-    user.refreshTokens.push({
-      token: newToken.refreshToken,
-      createdAt: new Date(),
-    });
-    if (user.refreshTokens.length > 3) {
-      user.refreshTokens = user.refreshTokens.slice(-3);
-    }
-    await user.save();
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $push: {
+          refreshTokens: {
+            $each: [{ token: newToken.refreshToken, createdAt: new Date() }],
+            $slice: -3,
+          },
+        },
+      }
+    );
 
     const isProd = process.env.NODE_ENV === "production";
-
     res.cookie("refreshToken", newToken.refreshToken, {
       httpOnly: true,
       secure: isProd,
@@ -458,22 +459,18 @@ const refreshToken = async (req, res) => {
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
     return res.status(200).json({
       success: true,
       message: "Token refreshed successfully",
       accessToken: newToken.accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user.id, email: user.email, role: user.role },
     });
   } catch (error) {
     console.error("Refresh token error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 

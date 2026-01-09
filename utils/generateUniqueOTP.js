@@ -23,7 +23,7 @@ const generateUniqueOTP = async (email) => {
         otp,
       };
 
-      // This will throw error if OTP already exists (unique index on otp field)
+      // This will throw error if OTP already exists
       const otpBody = await OTP.create(otpPayload);
 
       console.log(`Unique OTP generated: ${otp} (Attempt ${attempts})`);
