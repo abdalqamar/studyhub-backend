@@ -85,14 +85,12 @@ const updateLesson = async (req, res) => {
     const { title, description } = req.body;
     const { sectionId, lessonId } = req.params;
     const videoFile = req.files?.videoFile?.[0] || null;
-    // throw new Error("TEST FORCE ERROR");
 
     // Validation
     if (!sectionId) {
-      return res.status(400).json({
-        success: false,
-        message: "sectionId is required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "sectionId is required" });
     }
 
     if (!title && !description && !videoFile) {
@@ -102,15 +100,14 @@ const updateLesson = async (req, res) => {
     }
 
     // Find existing lesson
-    const lessonExists = await Lesson.findById(lessonId);
-    if (!lessonExists) {
-      return res.status(404).json({
-        success: false,
-        message: "Lesson not found",
-      });
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Lesson not found" });
     }
 
-    const oldPublicId = lessonExists.publicId;
+    const oldVideoUrl = lesson.videoUrl;
     const updatedData = {};
 
     if (title) updatedData.title = title;
@@ -118,7 +115,6 @@ const updateLesson = async (req, res) => {
 
     // Handle video replacement
     if (videoFile) {
-      // Validate file size (200MB)
       const maxSize = 200 * 1024 * 1024;
       if (videoFile.size > maxSize) {
         return res.status(400).json({
@@ -127,38 +123,39 @@ const updateLesson = async (req, res) => {
         });
       }
 
-      // Upload new video to Cloudinary
       const uploadResult = await uploadOnCloudinary(
         videoFile.path,
         process.env.FOLDER_NAME
       );
-
       if (!uploadResult) {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload new video",
-        });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to upload new video" });
       }
 
-      // Update video fields
       updatedData.videoUrl = uploadResult.secure_url;
-      updatedData.publicId = uploadResult.public_id;
       updatedData.duration = uploadResult.duration
         ? parseFloat((uploadResult.duration / 60).toFixed(2))
         : null;
     }
 
-    // Update lesson in database
+    // Update lesson
     const updatedLesson = await Lesson.findByIdAndUpdate(
       lessonId,
       updatedData,
-      { new: true, runValidators: true }
+      {
+        new: true,
+        runValidators: true,
+      }
     );
 
-    if (videoFile && oldPublicId && updatedData.publicId) {
-      deleteFromCloudinary(oldPublicId)
-        .then(() => console.log("Old video deleted:", oldPublicId))
-        .catch((err) => console.error("Failed to delete old video:", err));
+    // Delete old video from Cloudinary
+    if (videoFile && oldVideoUrl) {
+      try {
+        await deleteFromCloudinary(oldVideoUrl);
+      } catch (err) {
+        console.error("Old video delete failed:", err.message);
+      }
     }
 
     return res.status(200).json({
@@ -181,8 +178,7 @@ const updateLesson = async (req, res) => {
 const deleteLesson = async (req, res) => {
   try {
     const { sectionId, lessonId } = req.params;
-    // throw new Error("TEST FORCE ERROR");
-    // Validation
+
     if (!lessonId || !sectionId) {
       return res.status(400).json({
         success: false,
@@ -199,17 +195,15 @@ const deleteLesson = async (req, res) => {
       });
     }
 
-    // Delete video from Cloudinary first
-    if (lessonExists.publicId) {
+    const oldVideoUrl = lessonExists.videoUrl;
+
+    // Delete video from Cloudinary
+    if (oldVideoUrl) {
       try {
-        await deleteFromCloudinary(lessonExists.publicId);
-        console.log("Video deleted from Cloudinary:", lessonExists.publicId);
+        await deleteFromCloudinary(oldVideoUrl);
+        console.log("Video deleted from Cloudinary");
       } catch (error) {
         console.error("Failed to delete video from Cloudinary:", error);
-        return res.status(500).json({
-          success: false,
-          message: "Error while deleting video from Cloudinary",
-        });
       }
     }
 
@@ -219,7 +213,7 @@ const deleteLesson = async (req, res) => {
     // Delete lesson from database
     await Lesson.findByIdAndDelete(lessonId);
 
-    // Return only IDs (no populate needed)
+    // Return only IDs in response
     return res.status(200).json({
       success: true,
       message: "Lesson deleted successfully",

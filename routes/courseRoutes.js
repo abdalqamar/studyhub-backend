@@ -37,7 +37,7 @@ import {
 
 router.get("/", getAllCourses);
 
-// INSTRUCTOR ROUTES (Specific routes FIRST!)
+// INSTRUCTOR ROUTES
 router.get(
   "/instructor/my-courses",
   isAuthenticated,

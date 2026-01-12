@@ -6,26 +6,27 @@ import {
   deleteCategory,
   getAllCategories,
   getCategoryById,
+  updateCategory,
 } from "../controllers/categoryController.js";
 
 const router = express.Router();
 
 router.get("/", getAllCategories);
-router.get("/:categoryId", getCategoryById);
+router.get("/:id", getCategoryById);
 router.post(
   "/",
-  upload.fields([{ name: "categoryImage", maxCount: 1 }]),
   isAuthenticated,
   isAdmin,
+  upload.single("image"),
   createCategory
 );
 router.put(
-  "/:categoryId",
-  upload.fields([{ name: "categoryImage", maxCount: 1 }]),
+  "/:id",
   isAuthenticated,
   isAdmin,
-  createCategory
+  upload.single("image"),
+  updateCategory
 );
 
-router.delete("/:categoryId", isAuthenticated, isAdmin, deleteCategory);
+router.delete("/:id", isAuthenticated, isAdmin, deleteCategory);
 export default router;

@@ -1,22 +1,34 @@
 import Category from "../models/categoryModal.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 
 const createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
-    const localFile = req.files?.categoryImage?.[0] || null;
+    const localFile = req.file ? req.file.path : null;
+
     if (!name || !description || !localFile) {
       return res.status(400).json({
         success: false,
-        message: "All fields required",
+        message: "All fields including image are required",
       });
     }
 
     const uploadResult = await uploadOnCloudinary(
-      localFile.path,
+      localFile,
       process.env.FOLDER_NAME
     );
-    const category = await Category.create({
+
+    if (!uploadResult || !uploadResult.secure_url) {
+      return res.status(500).json({
+        success: false,
+        message: "Cloudinary upload failed",
+      });
+    }
+
+    const updatedCategory = await Category.create({
       name,
       description,
       image: uploadResult.secure_url,
@@ -24,14 +36,14 @@ const createCategory = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "category created",
-      category,
+      message: "Category created",
+      updatedCategory,
     });
   } catch (error) {
-    console.log(error.message);
+    console.log("Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "create category field",
+      message: "Failed to create category",
     });
   }
 };
@@ -64,23 +76,72 @@ const deleteCategory = async (req, res) => {
 
 const updateCategory = async (req, res) => {
   try {
-    const { name, description } = req.body;
     const { id } = req.params;
+    const { name, description } = req.body;
+    const localFile = req.file ? req.file.path : null;
 
-    const category = await Category.findByIdAndUpdate(
-      id,
-      { name, description },
-      { new: true }
-    );
-
-    if (!category) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Category not found" });
+    // At-least-one-field validation
+    if (!name && !description && !localFile && req.body.image !== "") {
+      return res.status(400).json({
+        success: false,
+        message: "At least one field is required to update",
+      });
     }
+
+    // Find existing category
+    const category = await Category.findById(id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    const updateData = {};
+
+    // Name
+    if (name) updateData.name = name;
+
+    // Description
+    if (description) updateData.description = description;
+
+    // Image handling
+    const shouldRemoveImage = req.body.image === "";
+
+    if (shouldRemoveImage && category.image) {
+      await deleteFromCloudinary(category.image);
+      updateData.image = "";
+    } else if (localFile) {
+      const uploadResult = await uploadOnCloudinary(
+        localFile,
+        process.env.FOLDER_NAME
+      );
+
+      if (!uploadResult || !uploadResult.secure_url) {
+        return res.status(500).json({
+          success: false,
+          message: "Image upload failed",
+        });
+      }
+
+      // Delete old image if it exists
+      if (category.image) {
+        await deleteFromCloudinary(category.image);
+      }
+
+      updateData.image = uploadResult.secure_url;
+    }
+
+    // Update only the fields present in updateData
+    const updatedCategory = await Category.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
     return res.status(200).json({
       success: true,
-      data: category,
+      message: "Category updated successfully",
+      updatedCategory,
     });
   } catch (error) {
     console.error("Error updating category:", error.message);

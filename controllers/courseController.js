@@ -11,112 +11,6 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
-const updateCourse = async (req, res) => {
-  try {
-    console.log(req.body);
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid course ID",
-      });
-    }
-
-    // Fetch course
-    const course = await Course.findById(id);
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
-    }
-
-    if (
-      course.instructor.toString() !== req.user.id &&
-      req.user.role !== "admin"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized to update this course",
-      });
-    }
-
-    if (course.status === "rejected") {
-      req.body.status = "pending";
-      req.body.feedback = "";
-    }
-
-    const localFile = req.files?.courseThumbnail?.[0] || null;
-
-    const oldPublicId = course.thumbnailPublicId;
-
-    let thumbnailUrl = null;
-    let newPublicId = null;
-
-    if (localFile) {
-      const uploadResult = await uploadOnCloudinary(
-        localFile.path,
-        process.env.FOLDER_NAME
-      );
-
-      if (uploadResult) {
-        thumbnailUrl = uploadResult.secure_url;
-        newPublicId = uploadResult.public_id;
-      }
-    }
-
-    const updates = prepareUpdates(req.body, thumbnailUrl, newPublicId);
-
-    // Validate category if provided
-    if (updates.category && updates.category !== course.category.toString()) {
-      const categoryExists = await Category.findById(updates.category);
-      if (!categoryExists) {
-        return res.status(404).json({
-          success: false,
-          message: "Category not found",
-        });
-      }
-    }
-
-    Object.assign(course, updates);
-    await course.save();
-
-    if (localFile && oldPublicId) {
-      try {
-        await deleteFromCloudinary(oldPublicId);
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          message: error.message,
-        });
-      }
-    }
-    // Return populated course
-    const populatedCourse = await Course.findById(id)
-      .populate("instructor", "firstName lastName")
-      .populate({
-        path: "courseContent",
-        populate: {
-          path: "lesson",
-        },
-      })
-      .populate("category", "name");
-
-    return res.status(200).json({
-      success: true,
-      message: "Course updated successfully",
-      course: populatedCourse,
-    });
-  } catch (error) {
-    console.log(error.message);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
 const createCourse = async (req, res) => {
   try {
     if (req.user.role !== "instructor" && req.user.role !== "admin") {
@@ -239,44 +133,53 @@ const deleteCourse = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Course Id is required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Course Id is required" });
     }
 
     const course = await Course.findById(id);
     if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
-    for (let userId of course.enrolledStudents) {
-      await User.findByIdAndUpdate(userId, {
-        $pull: { enrolledCourses: id },
-      });
+    // Delete thumbnail from Cloudinary
+    const thumbnailUrl = course.thumbnail;
+    if (thumbnailUrl) {
+      try {
+        await deleteFromCloudinary(thumbnailUrl);
+      } catch (err) {
+        console.error("Thumbnail delete failed:", err.message);
+      }
     }
-    for (let sectionId of course.courseContent) {
-      const section = await Course.findById(sectionId);
+
+    // Remove from enrolled students
+    for (const userId of course.enrolledStudents) {
+      await User.findByIdAndUpdate(userId, { $pull: { enrolledCourses: id } });
+    }
+
+    // Delete sections & lessons
+    for (const sectionId of course.courseContent) {
+      const section = await Section.findById(sectionId);
       if (section) {
         await Lesson.deleteMany({ section: sectionId });
         await Section.findByIdAndDelete(sectionId);
       }
     }
+
+    // Delete course
     await Course.findByIdAndDelete(id);
-    res.status(200).json({
+
+    return res.status(200).json({
       success: true,
-      message: "Course deleted successful",
+      message: "Course deleted successfully",
       data: {},
     });
   } catch (error) {
-    console.log(error.message);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.error("Error deleting course:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -433,47 +336,52 @@ const getInstructorCourses = async (req, res) => {
   }
 };
 
-// Helper function to prepare updates
-function prepareUpdates(body, thumbnailUrl, newPublicId) {
+// Helper to prepare updates
+function prepareUpdates(body, thumbnailUrl) {
   const updates = {};
 
-  const stringFields = [
-    "title",
-    "description",
-    "status",
-    "requirements",
-    "instructions",
-  ];
-  stringFields.forEach((field) => {
-    if (body[field]?.trim()) updates[field] = body[field].trim();
+  // String fields
+  const stringFields = ["title", "description", "requirements"];
+  stringFields.forEach((f) => {
+    if (body[f]?.trim()) updates[f] = body[f].trim();
   });
 
-  const arrayFields = ["tags", "whatYouWillLearn"];
-  arrayFields.forEach((field) => {
-    if (body[field]) {
-      updates[field] = Array.isArray(body[field]) ? body[field] : [body[field]];
+  // Instructions → array
+  if (body.instructions?.trim()) {
+    updates.instructions = body.instructions
+      .split(",")
+      .map((i) => i.trim())
+      .filter(Boolean);
+  }
+
+  // Array fields (tags, whatYouWillLearn)
+  ["tags", "whatYouWillLearn"].forEach((f) => {
+    if (!body[f]) return;
+    if (typeof body[f] === "string") {
+      updates[f] = body[f]
+        .split(",")
+        .map((i) => i.trim())
+        .filter(Boolean);
+    } else if (Array.isArray(body[f])) {
+      updates[f] = body[f].map((i) => i.trim()).filter(Boolean);
     }
   });
 
+  // Price
   if (body.price !== undefined) {
-    const price = Number(body.price);
-    if (!isNaN(price) && price >= 0) {
-      updates.price = price;
-    }
+    const p = Number(body.price);
+    if (!isNaN(p) && p >= 0) updates.price = p;
   }
 
-  if (thumbnailUrl) {
-    updates.thumbnail = thumbnailUrl;
-    updates.thumbnailPublicId = newPublicId;
-  }
+  // Thumbnail (only URL)
+  if (thumbnailUrl) updates.thumbnail = thumbnailUrl;
 
-  if (body.category) {
-    updates.category = body.category;
-  }
+  // Category
+  if (body.category) updates.category = body.category;
 
-  if (body.status) {
-    updates.status = body.status;
-  }
+  // Status
+  const valid = ["draft", "pending", "approved", "rejected"];
+  if (body.status && valid.includes(body.status)) updates.status = body.status;
 
   return updates;
 }
@@ -770,6 +678,96 @@ const getCourseContent = async (req, res) => {
   }
 };
 
+const updateCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid course ID" });
+    }
+
+    const course = await Course.findById(id);
+    if (!course) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
+    }
+
+    // Authorisation
+    if (
+      course.instructor.toString() !== req.user.id &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to update this course",
+      });
+    }
+
+    // Auto-reset status if rejected
+    if (course.status === "rejected") {
+      req.body.status = "pending";
+      req.body.feedback = "";
+    }
+
+    // Thumbnail file
+    const localFile = req.files?.courseThumbnail?.[0] || null;
+    const oldThumbnailUrl = course.thumbnail; // secure_url only
+
+    let thumbnailUrl = null;
+
+    if (localFile) {
+      const uploadResult = await uploadOnCloudinary(
+        localFile.path,
+        process.env.FOLDER_NAME
+      );
+      if (uploadResult) thumbnailUrl = uploadResult.secure_url;
+    }
+
+    // Build updates
+    const updates = prepareUpdates(req.body, thumbnailUrl);
+
+    // Validate category if changing
+    if (updates.category && updates.category !== course.category.toString()) {
+      const cat = await Category.findById(updates.category);
+      if (!cat) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Category not found" });
+      }
+    }
+
+    // Apply updates
+    Object.assign(course, updates);
+    await course.save();
+
+    // Delete old thumbnail (URL-based, same as category)
+    if (localFile && oldThumbnailUrl) {
+      try {
+        await deleteFromCloudinary(oldThumbnailUrl);
+      } catch (err) {
+        console.error("Old thumbnail delete failed:", err.message);
+      }
+    }
+
+    // Return populated course
+    const populatedCourse = await Course.findById(id)
+      .populate("instructor", "firstName lastName")
+      .populate({ path: "courseContent", populate: { path: "lesson" } })
+      .populate("category", "name");
+
+    return res.status(200).json({
+      success: true,
+      message: "Course updated successfully",
+      course: populatedCourse,
+    });
+  } catch (error) {
+    console.error("Error updating course:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 export {
   createCourse,
   deleteCourse,
