@@ -72,7 +72,7 @@ const createCourse = async (req, res) => {
     let publicId = null;
     const uploadResult = await uploadOnCloudinary(
       localFile.path,
-      process.env.FOLDER_NAME
+      process.env.FOLDER_NAME,
     );
 
     thumbnailUrl = uploadResult.secure_url;
@@ -102,14 +102,14 @@ const createCourse = async (req, res) => {
       {
         $push: { enrolledCourses: newCourse._id },
       },
-      { new: true }
+      { new: true },
     );
 
     // Add course to category's courses array
     await Category.findByIdAndUpdate(
       category,
       { $push: { courses: newCourse._id } },
-      { new: true }
+      { new: true },
     );
 
     return res.status(201).json({
@@ -183,34 +183,49 @@ const deleteCourse = async (req, res) => {
   }
 };
 
-const getAllCourses = async (_, res) => {
+const getPublicCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ status: "approved" })
-      .populate("category", "name")
-      .populate("instructor", "firstName lastName")
-      .populate({
-        path: "courseContent",
-        populate: {
-          path: "lesson",
-          select: "duration",
-        },
-      })
-      .lean();
+    const { search, category, page = 1, limit = 12 } = req.query;
 
-    if (!courses.length) {
-      return res.status(200).json({
-        success: true,
-        message: "No approved courses found",
-        courses: [],
-      });
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const matchQuery = {
+      status: "approved",
+    };
+
+    if (category) {
+      matchQuery.category = category;
     }
+
+    if (search) {
+      matchQuery.title = { $regex: search, $options: "i" };
+    }
+
+    const [courses, total] = await Promise.all([
+      Course.find(matchQuery)
+        .populate("category", "name")
+        .populate("instructor", "firstName lastName")
+        .populate({
+          path: "courseContent",
+          populate: {
+            path: "lesson",
+            select: "duration",
+          },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+
+      Course.countDocuments(matchQuery),
+    ]);
 
     const formattedCourses = courses.map((course) => {
       const lessons = course.courseContent.flatMap((sec) => sec.lesson || []);
 
       const totalMinutes = lessons.reduce(
         (sum, l) => sum + (l.duration || 0),
-        0
+        0,
       );
 
       const hours = Math.floor(totalMinutes / 60);
@@ -228,7 +243,6 @@ const getAllCourses = async (_, res) => {
         instructor: `${course.instructor?.firstName || ""} ${
           course.instructor?.lastName || ""
         }`.trim(),
-
         totalLectures: lessons.length,
         totalDuration: `${hours}h ${minutes}m`,
       };
@@ -236,14 +250,148 @@ const getAllCourses = async (_, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Approved courses fetched successfully",
+      message: "Courses fetched successfully",
       courses: formattedCourses,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
-    console.error("Error getting courses:", error.message);
+    console.error("Error fetching public courses:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch approved courses",
+      message: "Failed to fetch courses",
+    });
+  }
+};
+
+// helper function to calculate course duration
+const calculateCourseDuration = async (courseContent = []) => {
+  if (!courseContent.length) return "0h 0m";
+
+  const sections = await Section.find({
+    _id: { $in: courseContent },
+  }).populate("lesson", "duration");
+
+  const totalMinutes = sections
+    .flatMap((sec) => sec.lesson)
+    .reduce((acc, lesson) => acc + (lesson?.duration || 0), 0);
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours}h ${minutes}m`;
+};
+
+const fetchAllCourses = async (req, res) => {
+  try {
+    const { role, id: userId } = req.user;
+
+    const {
+      instructor,
+      status,
+      category,
+      search,
+      page = 1,
+      limit = 12,
+    } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const matchQuery = {};
+
+    if (status) matchQuery.status = status;
+    if (category) matchQuery.category = category;
+    if (search) {
+      matchQuery.title = { $regex: search, $options: "i" };
+    }
+
+    if (instructor === "me") {
+      if (role !== "instructor") {
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+      matchQuery.instructor = userId;
+    }
+
+    const [courses, total] = await Promise.all([
+      Course.find(matchQuery)
+        .populate("category", role === "admin" ? "name" : "")
+        .populate(
+          "instructor",
+          role === "admin" ? "firstName lastName email" : "",
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+
+      Course.countDocuments(matchQuery),
+    ]);
+
+    if (role === "admin") {
+      const adminCourses = await Promise.all(
+        courses.map(async (course) => ({
+          ...course,
+          enrolledCount: course.enrolledStudents?.length || 0,
+          averageRating: course.averageRating || 0,
+          duration: await calculateCourseDuration(course.courseContent),
+        })),
+      );
+
+      return res.status(200).json({
+        success: true,
+        courses: adminCourses,
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / Number(limit)),
+        },
+      });
+    }
+
+    if (role === "instructor") {
+      const instructorCourses = await Promise.all(
+        courses.map(async (course) => ({
+          _id: course._id,
+          title: course.title,
+          status: course.status,
+          createdAt: course.createdAt,
+          thumbnail: course.thumbnail,
+          price: course.price,
+          enrolledCount: course.enrolledStudents?.length || 0,
+          averageRating: course.averageRating || 0,
+          duration: await calculateCourseDuration(course.courseContent),
+        })),
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Instructor courses fetched successfully",
+        courses: instructorCourses,
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / Number(limit)),
+        },
+      });
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: "Unauthorized role",
+    });
+  } catch (error) {
+    console.error("Get courses error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch courses",
     });
   }
 };
@@ -281,57 +429,6 @@ const getCourseById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "server error",
-    });
-  }
-};
-
-const getInstructorCourses = async (req, res) => {
-  try {
-    const { id } = req.user;
-
-    const myCourses = await Course.find({ instructor: id })
-      .populate("category", "name")
-      .populate("courseContent")
-      .populate("instructor", "firstName lastName")
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const coursesWithExtras = await Promise.all(
-      myCourses.map(async (course) => {
-        const sectionIds = course.courseContent.map((sec) => sec._id);
-
-        const sections = await Section.find({
-          _id: { $in: sectionIds },
-        }).populate("lesson", "duration");
-
-        const allLessons = sections.flatMap((sec) => sec.lesson);
-
-        const totalMinutes = allLessons.reduce(
-          (acc, lesson) => acc + (lesson?.duration || 0),
-          0
-        );
-
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-
-        return {
-          ...course,
-          enrolledCount: course.enrolledStudents?.length || 0,
-          averageRating: course.averageRating || 0,
-          duration: `${hours}h ${minutes}m`,
-        };
-      })
-    );
-    res.status(200).json({
-      success: true,
-      message: "all courses fetched by instructor",
-      courses: coursesWithExtras,
-    });
-  } catch (error) {
-    console.error("Error fetching instructor courses:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch your courses",
     });
   }
 };
@@ -429,13 +526,13 @@ const getCoursePreview = async (req, res) => {
 
     // Extract lessons
     const allLessons = course.courseContent.flatMap(
-      (section) => section.lesson || []
+      (section) => section.lesson || [],
     );
 
     // Total duration
     const totalMinutes = allLessons.reduce(
       (sum, lesson) => sum + (lesson?.duration || 0),
-      0
+      0,
     );
 
     const hours = Math.floor(totalMinutes / 60);
@@ -540,13 +637,13 @@ const getCourseDetails = async (req, res) => {
 
     // Extract lessons
     const allLessons = course.courseContent.flatMap(
-      (section) => section.lesson || []
+      (section) => section.lesson || [],
     );
 
     // Total duration
     const totalMinutes = allLessons.reduce(
       (sum, lesson) => sum + (lesson?.duration || 0),
-      0
+      0,
     );
 
     const hours = Math.floor(totalMinutes / 60);
@@ -629,7 +726,7 @@ const getCourseContent = async (req, res) => {
     }
 
     const allLessons = course.courseContent.flatMap(
-      (section) => section.lesson || []
+      (section) => section.lesson || [],
     );
 
     const totalLessons = allLessons.length;
@@ -721,7 +818,7 @@ const updateCourse = async (req, res) => {
     if (localFile) {
       const uploadResult = await uploadOnCloudinary(
         localFile.path,
-        process.env.FOLDER_NAME
+        process.env.FOLDER_NAME,
       );
       if (uploadResult) thumbnailUrl = uploadResult.secure_url;
     }
@@ -769,13 +866,13 @@ const updateCourse = async (req, res) => {
   }
 };
 export {
+  fetchAllCourses,
   createCourse,
   deleteCourse,
   updateCourse,
-  getAllCourses,
+  getPublicCourses,
   getCourseById,
   getCourseDetails,
-  getInstructorCourses,
   getCoursePreview,
   getCourseContent,
 };

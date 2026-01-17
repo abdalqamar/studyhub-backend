@@ -1,16 +1,20 @@
 import express from "express";
 const router = express.Router();
+
 import upload from "../utils/multer.js";
+
+// CONTROLLERS
+
 import {
   createCourse,
   deleteCourse,
   updateCourse,
-  getAllCourses,
+  getPublicCourses,
   getCourseDetails,
-  getInstructorCourses,
   getCoursePreview,
   getCourseById,
   getCourseContent,
+  fetchAllCourses,
 } from "../controllers/courseController.js";
 
 import {
@@ -20,104 +24,119 @@ import {
 } from "../controllers/reviewController.js";
 
 import {
-  isAuthenticated,
-  isInstructor,
-  isStudent,
-} from "../middleware/authMiddleware.js";
-import {
   createSection,
   deleteSection,
   updateSection,
 } from "../controllers/sectionController.js";
+
 import {
   createLesson,
   deleteLesson,
   updateLesson,
 } from "../controllers/lessonController.js";
 
-router.get("/", getAllCourses);
+// MIDDLEWARE
 
-// INSTRUCTOR ROUTES
-router.get(
-  "/instructor/my-courses",
+import {
   isAuthenticated,
   isInstructor,
-  getInstructorCourses
-);
+  isStudent,
+} from "../middleware/authMiddleware.js";
 
+// PUBLIC ROUTES (NO AUTH)
+
+// Public courses (approved only + filters)
+router.get("/", getPublicCourses);
+
+// ADMIN / INSTRUCTOR DASHBOARD
+router.get("/manage", isAuthenticated, fetchAllCourses);
+
+//  COURSE VIEW ROUTES (
+
+// Course preview (logged-in users)
+router.get("/:id/preview", isAuthenticated, getCoursePreview);
+
+// Student enrolled course content
+router.get("/:id/content", isAuthenticated, isStudent, getCourseContent);
+
+// Public course details (KEEP AFTER /manage)
+router.get("/:id", getCourseDetails);
+
+//  REVIEWS
+router.put("/:id/reviews", isAuthenticated, updateReview);
+router.delete("/:id/reviews", isAuthenticated, deleteReview);
+router.post("/:id/reviews", isAuthenticated, createReview);
+
+// INSTRUCTOR COURSE CRUD ROUTES
+// Create course
 router.post(
   "/",
   isAuthenticated,
   isInstructor,
   upload.fields([{ name: "courseThumbnail", maxCount: 1 }]),
-  createCourse
+  createCourse,
 );
 
+// Update course
 router.put(
   "/:id",
   isAuthenticated,
   isInstructor,
   upload.fields([{ name: "courseThumbnail", maxCount: 1 }]),
-  updateCourse
+  updateCourse,
 );
 
+// Delete course
 router.delete("/:id", isAuthenticated, isInstructor, deleteCourse);
-router.get("/:id/content", isAuthenticated, isStudent, getCourseContent);
-router.get("/:id/preview", isAuthenticated, getCoursePreview);
-router.get("/:id", getCourseDetails); // for public access (course marketing page)
+
+// Get course for editing
 router.get("/edit/:id", isAuthenticated, isInstructor, getCourseById);
 
-// REVIEWS/RATINGS
-
-router.post("/:id/reviews", isAuthenticated, createReview);
-
+// SECTIONS
 router.post(
   "/:courseId/sections",
   isAuthenticated,
   isInstructor,
-  createSection
+  createSection,
 );
 
-// Update section
 router.put(
   "/:courseId/sections/:sectionId",
   isAuthenticated,
   isInstructor,
-  updateSection
+  updateSection,
 );
 
-// Delete section
 router.delete(
   "/:courseId/sections/:sectionId",
   isAuthenticated,
   isInstructor,
-  deleteSection
+  deleteSection,
 );
 
-// Create lesson
+//  LESSONS
+
 router.post(
   "/:courseId/sections/:sectionId/lessons",
   isAuthenticated,
   isInstructor,
   upload.fields([{ name: "videoFile", maxCount: 1 }]),
-  createLesson
+  createLesson,
 );
 
-// Update lesson
 router.put(
   "/sections/:sectionId/lessons/:lessonId",
   isAuthenticated,
   isInstructor,
   upload.fields([{ name: "videoFile", maxCount: 1 }]),
-  updateLesson
+  updateLesson,
 );
 
-// Delete lesson
 router.delete(
   "/:sectionId/lessons/:lessonId",
   isAuthenticated,
   isInstructor,
-  deleteLesson
+  deleteLesson,
 );
 
 export default router;

@@ -8,6 +8,7 @@ import courseRoutes from "./routes/courseRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import instructorRoutes from "./routes/instructorRoutes.js";
 import { razorpayWebhook } from "./controllers/paymentController.js";
 import corsConfig from "./config/cors.js";
 
@@ -38,6 +39,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/courses", courseRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/instructor", instructorRoutes);
 app.use("/api/v1/payment", paymentRoutes);
 
 app.get("/", (_, res) => {

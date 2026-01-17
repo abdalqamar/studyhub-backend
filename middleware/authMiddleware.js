@@ -1,9 +1,9 @@
 import jwt from "jsonwebtoken";
+import User from "../models/userModal.js";
 
 const isAuthenticated = async (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    console.log("token", token);
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -12,7 +12,7 @@ const isAuthenticated = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-
+    // console.log(decoded);
     req.user = decoded;
     next();
   } catch (error) {
@@ -35,6 +35,29 @@ const isAuthenticated = async (req, res, next) => {
       success: false,
       message: "Authentication failed",
     });
+  }
+};
+
+const updateLastActive = async (req, res, next) => {
+  try {
+    if (!req.user?.id) return next();
+
+    const FIVE_MIN = 5 * 60 * 1000;
+    const user = await User.findById(req.user.id).select("lastActive");
+
+    if (
+      !user.lastActive ||
+      Date.now() - new Date(user.lastActive).getTime() > FIVE_MIN
+    ) {
+      await User.findByIdAndUpdate(req.user.id, {
+        lastActive: new Date(),
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("LastActive update failed:", err.message);
+    next();
   }
 };
 
@@ -66,4 +89,4 @@ const isAdmin = async (req, res, next) => {
   next();
 };
 
-export { isAuthenticated, isStudent, isInstructor, isAdmin };
+export { isAuthenticated, isStudent, isInstructor, isAdmin, updateLastActive };

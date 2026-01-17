@@ -151,6 +151,13 @@ const login = async (req, res) => {
       });
     }
 
+    if (user.status === "suspended") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been suspended. Contact support.",
+      });
+    }
+
     // Password check
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
@@ -182,7 +189,11 @@ const login = async (req, res) => {
       user.refreshTokens = user.refreshTokens.slice(-3);
     }
 
+    user.lastActive = new Date();
+    user.status = "active";
+
     await user.save();
+
     const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("refreshToken", refreshToken, {
@@ -202,6 +213,7 @@ const login = async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        lastActive: user.lastActive,
       },
     });
   } catch (error) {
@@ -226,11 +238,13 @@ const logout = async (req, res) => {
 
     await User.updateOne(
       { "refreshTokens.token": refreshToken },
-      { $pull: { refreshTokens: { token: refreshToken } } }
+      {
+        $pull: { refreshTokens: { token: refreshToken } },
+        $set: { status: "inactive" },
+      }
     );
 
     res.clearCookie("refreshToken", { httpOnly: true });
-    console.log("Logged out successfully");
     return res.status(200).json({
       success: true,
       message: "Logged out successfully",
@@ -358,11 +372,10 @@ const resetPassword = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-    console.log("req.body", req.body);
-    const userId = req.user.id;
-    const { confirmPassword, currentPassword, newPassword } = req.body;
-    const user = await User.findById(userId);
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    const { id } = req.user;
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+    const user = await User.findById(id);
+    if (!oldPassword || !newPassword || !confirmPassword) {
       return res
         .status(400)
         .json({ success: false, message: "All fields are required" });
@@ -374,11 +387,11 @@ const changePassword = async (req, res) => {
         .json({ success: false, message: "Passwords do not match" });
     }
 
-    const isMatch = user.comparePassword(currentPassword);
+    const isMatch = await user.comparePassword(oldPassword);
     if (!isMatch) {
       return res
         .status(401)
-        .json({ success: false, message: "Current password is incorrect" });
+        .json({ success: false, message: "Old password is incorrect" });
     }
 
     user.password = newPassword;
@@ -427,17 +440,25 @@ const refreshToken = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Invalid refresh token" });
 
+    if (user.status === "suspended") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been suspended",
+      });
+    }
+
     const newToken = generateTokens({
       id: user._id,
       email: user.email,
       role: user.role,
     });
 
-    //  update user's refresh tokens in DB
+    //  update(rotate) user's refresh tokens in DB
     await User.updateOne(
       { _id: user._id },
       { $pull: { refreshTokens: { token: refreshTokenCookie } } }
     );
+
     await User.updateOne(
       { _id: user._id },
       {

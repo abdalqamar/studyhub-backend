@@ -1,5 +1,8 @@
 import express from "express";
-import { isAuthenticated } from "../middleware/authMiddleware.js";
+import {
+  isAuthenticated,
+  updateLastActive,
+} from "../middleware/authMiddleware.js";
 import {
   updateProfile,
   updateProfileImage,
@@ -8,6 +11,8 @@ import {
 } from "../controllers/profileController.js";
 import upload from "../utils/multer.js";
 const router = express.Router();
+
+router.use(isAuthenticated, updateLastActive);
 
 router.put("/update-profile", isAuthenticated, updateProfile);
 
