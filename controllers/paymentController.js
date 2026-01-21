@@ -1,4 +1,4 @@
-import Payment from "../models/paymentModal.js";
+import Payment from "../models/payment.modal.js";
 import User from "../models/userModal.js";
 import Course from "../models/courseModal.js";
 import crypto from "crypto";
