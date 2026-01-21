@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const PaymentSchema = new mongoose.Schema(
+const paymentSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -46,5 +46,5 @@ const PaymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const Payment = mongoose.model("Payment", PaymentSchema);
+const Payment = mongoose.model("Payment", paymentSchema);
 export default Payment;

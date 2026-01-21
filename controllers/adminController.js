@@ -1,5 +1,4 @@
 import Course from "../models/courseModal.js";
-import Section from "../models/sectionModal.js";
 import User from "../models/userModal.js";
 import Profile from "../models/profileModal.js";
 
