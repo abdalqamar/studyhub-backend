@@ -6,7 +6,6 @@ import sendEmail from "../utils/sendEmail.js";
 import enrollmentEmailTemplate from "../template/enrollmentEmailTemplate.js";
 import paymentFailedEmailTemplate from "../template/paymentFailedEmailTemplate.js";
 import razorpay from "../config/razorpay.js";
-import mongoose from "mongoose";
 
 // create Razorpay order
 const createOrder = async (req, res) => {
@@ -23,22 +22,19 @@ const createOrder = async (req, res) => {
     const user = await User.findById(userId);
 
     let totalAmount = 0;
-    const validCourses = [];
 
-    for (const cid of courseIds) {
-      const course = await Course.findById(cid);
+    const courses = await Course.find({ _id: { $in: courseIds } });
 
-      if (!course) {
-        return res.status(404).json({ message: `Course ${cid} not found` });
-      }
+    if (courses.length !== courseIds.length) {
+      return res.status(404).json({ message: "Course not found" });
+    }
 
-      if (user.enrolledCourses.includes(cid)) {
+    for (const course of courses) {
+      if (user.enrolledCourses.includes(course._id)) {
         return res
           .status(400)
           .json({ message: `Already enrolled in ${course.title}` });
       }
-
-      validCourses.push(course);
       totalAmount += course.price;
     }
 
@@ -99,54 +95,46 @@ const enrollStudent = async (payment) => {
   if (!notes) throw new Error("Invalid notes");
 
   const { userId, courseIds } = notes;
-  const session = await mongoose.startSession();
-  session.startTransaction();
 
-  try {
-    const [user, courses] = await Promise.all([
-      User.findById(userId).session(session),
-      Course.find({ _id: { $in: courseIds } }).session(session),
-    ]);
+  // fetch user & courses (NO session)
+  const [user, courses] = await Promise.all([
+    User.findById(userId),
+    Course.find({ _id: { $in: courseIds } }),
+  ]);
 
-    if (!user) throw new Error("User not found");
-    if (courses.length !== courseIds.length) throw new Error("Course mismatch");
+  if (!user) throw new Error("User not found");
+  if (courses.length !== courseIds.length) throw new Error("Course mismatch");
 
-    // skip already enrolled courses
-    const enrolledSet = new Set(
-      (user.enrolledCourses || []).map((id) => id.toString()),
-    );
-    const newIds = courseIds.filter((id) => !enrolledSet.has(id.toString()));
-    if (!newIds.length)
-      return { alreadyEnrolled: true, enrolledTitles: [], userId };
+  // skip already enrolled courses
+  const enrolledSet = new Set(
+    (user.enrolledCourses || []).map((id) => id.toString()),
+  );
 
-    const titles = courses
-      .filter((c) => newIds.includes(c._id.toString()))
-      .map((c) => c.title);
+  const newIds = courseIds.filter((id) => !enrolledSet.has(id.toString()));
 
-    // atomic writes
-    await Promise.all([
-      User.updateOne(
-        { _id: userId },
-        { $addToSet: { enrolledCourses: { $each: newIds } } },
-        { session },
-      ),
-      ...newIds.map((id) =>
-        Course.updateOne(
-          { _id: id },
-          { $addToSet: { enrolledStudents: userId } },
-          { session },
-        ),
-      ),
-    ]);
-
-    await session.commitTransaction();
-    return { alreadyEnrolled: false, enrolledTitles: titles, userId };
-  } catch (err) {
-    await session.abortTransaction();
-    throw err;
-  } finally {
-    session.endSession();
+  if (!newIds.length) {
+    return { alreadyEnrolled: true, enrolledTitles: [], userId };
   }
+
+  const titles = courses
+    .filter((c) => newIds.includes(c._id.toString()))
+    .map((c) => c.title);
+
+  // enroll user in new courses
+  await Promise.all([
+    User.updateOne(
+      { _id: userId },
+      { $addToSet: { enrolledCourses: { $each: newIds } } },
+    ),
+    ...newIds.map((id) =>
+      Course.updateOne(
+        { _id: id },
+        { $addToSet: { enrolledStudents: userId } },
+      ),
+    ),
+  ]);
+
+  return { alreadyEnrolled: false, enrolledTitles: titles, userId };
 };
 
 // Email senders
@@ -246,6 +234,11 @@ const razorpayWebhook = async (req, res) => {
 
       // payment record creation
       const notes = parseNotes(payment);
+      if (!notes) {
+        console.warn("[Webhook] Invalid notes", payment.id);
+        return res.status(200).json({ success: true });
+      }
+
       const { userId, courseIds } = notes;
 
       const courses = await Course.find({
