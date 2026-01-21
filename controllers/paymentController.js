@@ -1,12 +1,11 @@
+import Payment from "../models/paymentModal.js";
 import User from "../models/userModal.js";
 import Course from "../models/courseModal.js";
-import Payment from "../models/paymentModal.js";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import enrollmentEmailTemplate from "../template/enrollmentEmailTemplate.js";
 import paymentFailedEmailTemplate from "../template/paymentFailedEmailTemplate.js";
 import razorpay from "../config/razorpay.js";
-import mongoose from "mongoose";
 
 const createOrder = async (req, res) => {
   try {
@@ -76,7 +75,7 @@ const verifySignature = (bodyBuffer, signature, secret) => {
   );
 };
 
-// extract userId & courseIds from payment.notes
+// extract userId & courseIds from payment notes
 const parseNotes = (payment) => {
   try {
     const notes = payment.notes || {};
