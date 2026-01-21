@@ -1,5 +1,6 @@
 import User from "../models/userModal.js";
 import Course from "../models/courseModal.js";
+import Payment from "../models/paymentModal.js";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import enrollmentEmailTemplate from "../template/enrollmentEmailTemplate.js";
@@ -111,7 +112,7 @@ const enrollStudent = async (payment) => {
 
     // skip already enrolled courses
     const enrolledSet = new Set(
-      (user.enrolledCourses || []).map((id) => id.toString())
+      (user.enrolledCourses || []).map((id) => id.toString()),
     );
     const newIds = courseIds.filter((id) => !enrolledSet.has(id.toString()));
     if (!newIds.length)
@@ -126,14 +127,14 @@ const enrollStudent = async (payment) => {
       User.updateOne(
         { _id: userId },
         { $addToSet: { enrolledCourses: { $each: newIds } } },
-        { session }
+        { session },
       ),
       ...newIds.map((id) =>
         Course.updateOne(
           { _id: id },
           { $addToSet: { enrolledStudents: userId } },
-          { session }
-        )
+          { session },
+        ),
       ),
     ]);
 
@@ -157,12 +158,12 @@ const sendEnrollmentEmail = (user, payment, titles) =>
         payment.amount / 100,
         payment.order_id,
         payment.id,
-        titles
+        titles,
       );
       await sendEmail(
         user.email,
         "Course Purchase & Enrollment Confirmation - StudyHub",
-        html
+        html,
       );
     } catch (e) {
       console.error("[Webhook] Enrollment email failed", {
@@ -183,7 +184,7 @@ const sendFailureEmail = (user, payment) =>
         getUserFullName(user),
         payment.amount / 100,
         payment.order_id,
-        reason
+        reason,
       );
       await sendEmail(user.email, "Payment Failed - StudyHub", html);
     } catch (e) {
@@ -227,44 +228,93 @@ const razorpayWebhook = async (req, res) => {
     order_id: payload?.payment?.entity?.order_id,
   });
 
-  // Paymenet success
+  // Payment success
   if (event === "payment.captured") {
     const payment = payload.payment.entity;
+
     try {
-      const { alreadyEnrolled, enrolledTitles, userId } = await enrollStudent(
-        payment
-      );
-      if (alreadyEnrolled) {
-        console.log("[Webhook] Already enrolled", {
-          order_id: payment.order_id,
-        });
-        return res
-          .status(200)
-          .json({ success: true, message: "Already enrolled" });
+      // check duplicate
+      const already = await Payment.findOne({
+        transactionId: payment.id,
+      });
+
+      if (already) {
+        console.log("[Webhook] Duplicate payment ignored", payment.id);
+        return res.status(200).json({ success: true });
       }
-      const user = await User.findById(userId).lean();
-      if (user) sendEnrollmentEmail(user, payment, enrolledTitles);
+
+      // payment record creation
+      const notes = parseNotes(payment);
+      const { userId, courseIds } = notes;
+
+      const courses = await Course.find({
+        _id: { $in: courseIds },
+      }).select("price instructor");
+
+      for (const course of courses) {
+        await Payment.create({
+          user: userId,
+          course: course._id,
+          instructor: course.instructor,
+          amount: course.price,
+          currency: payment.currency,
+          status: "success",
+          paymentMethod: "razorpay",
+          transactionId: payment.id,
+          paymentGatewayOrderId: payment.order_id,
+        });
+      }
+
+      // enroll student
+      const { alreadyEnrolled, enrolledTitles } = await enrollStudent(payment);
+
+      if (!alreadyEnrolled) {
+        const user = await User.findById(userId).lean();
+        if (user) sendEnrollmentEmail(user, payment, enrolledTitles);
+      }
+
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error("[Webhook] Enrollment error", {
-        order_id: payment.order_id,
-        error: err.message,
-      });
-      return res.status(500).json({ success: false, message: err.message });
+      console.error("[Webhook] payment.captured error", err.message);
+      return res.status(500).json({ success: false });
     }
   }
 
   // payment failed
   if (event === "payment.failed") {
     const payment = payload.payment.entity;
-    const notes = parseNotes(payment);
-    if (notes) {
-      const user = await User.findById(notes.userId)
-        .lean()
-        .catch(() => null);
-      if (user) sendFailureEmail(user, payment);
+
+    try {
+      const notes = parseNotes(payment);
+
+      if (notes) {
+        const { userId, courseIds } = notes;
+
+        // record failed payment
+        await Payment.create({
+          user: userId,
+          course: courseIds[0],
+          amount: payment.amount / 100,
+          currency: payment.currency,
+          status: "failed",
+          paymentMethod: "razorpay",
+          transactionId: payment.id,
+          paymentGatewayOrderId: payment.order_id,
+        });
+
+        // send failure email
+        const user = await User.findById(userId)
+          .lean()
+          .catch(() => null);
+
+        if (user) sendFailureEmail(user, payment);
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      console.error("[Webhook] payment.failed error", err.message);
+      return res.status(200).json({ success: true });
     }
-    return res.status(200).json({ success: true });
   }
 
   //unhandled
