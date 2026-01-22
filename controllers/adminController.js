@@ -1,6 +1,7 @@
 import Course from "../models/courseModal.js";
 import User from "../models/userModal.js";
 import Profile from "../models/profileModal.js";
+import Payment from "../models/payment.modal.js";
 
 const approveCourse = async (req, res) => {
   try {
@@ -286,28 +287,273 @@ const deleteUserByAdmin = async (req, res) => {
   }
 };
 
-const getUserGrowthAnalytics = async (req, res) => {};
-const getCoursePerformanceAnalytics = async (req, res) => {};
-const getPlatformRevenueAnalytics = async (req, res) => {};
-const getEnrollmentTrendsAnalytics = async (req, res) => {};
+const getAdminDashboard = async (req, res) => {
+  try {
+    const [
+      totalRevenue,
+      totalStudents,
+      totalInstructors,
+      totalCourses,
+      monthlyRevenue,
+      topInstructors,
+      courseCategories,
+      monthlyStudents,
+      monthlyInstructors,
+      newEnrollments,
+    ] = await Promise.all([
+      //  Total revenue
+      Payment.aggregate([
+        { $match: { status: "success" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
 
-const getUserAnalytics = async (req, res) => {};
-const getCourseAnalytics = async (req, res) => {};
-const getRevenueAnalytics = async (req, res) => {};
-const getEnrollmentAnalytics = async (req, res) => {};
+      //  Total students
+      User.countDocuments({ role: "student" }),
+
+      //  Total instructors
+      User.countDocuments({ role: "instructor" }),
+
+      //  Total courses
+      Course.countDocuments(),
+
+      //  Monthly revenue
+      Payment.aggregate([
+        { $match: { status: "success" } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
+            total: { $sum: "$amount" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+
+      //  Top instructors by earnings
+      Payment.aggregate([
+        { $match: { status: "success" } },
+        { $group: { _id: "$instructor", total: { $sum: "$amount" } } },
+        { $sort: { total: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "instructor",
+          },
+        },
+        { $unwind: "$instructor" },
+        {
+          $project: {
+            _id: 0,
+            instructorId: "$_id",
+            name: {
+              $concat: ["$instructor.firstName", " ", "$instructor.lastName"],
+            },
+            earnings: "$total",
+          },
+        },
+      ]),
+
+      // Course categories distribution
+      Course.aggregate([
+        {
+          $lookup: {
+            from: "categories",
+            localField: "category",
+            foreignField: "_id",
+            as: "category",
+          },
+        },
+        { $unwind: "$category" },
+        {
+          $group: {
+            _id: "$category.name",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+
+      //  Monthly students growth
+      User.aggregate([
+        { $match: { role: "student" } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+
+      //  Monthly instructors growth
+      User.aggregate([
+        { $match: { role: "instructor" } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+
+      // New enrollments per month
+      Payment.aggregate([
+        {
+          $match: {
+            status: "success",
+            createdAt: {
+              $gte: new Date(2026, 0, 1),
+              $lt: new Date(2027, 0, 1),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { month: { $month: "$createdAt" } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.month": 1 } },
+      ]),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalRevenue: totalRevenue[0]?.total || 0,
+          totalStudents,
+          totalInstructors,
+          totalCourses,
+        },
+        monthlyRevenue,
+        monthlyStudents,
+        monthlyInstructors,
+        topInstructors,
+        courseCategories,
+        newEnrollments,
+      },
+    });
+  } catch (error) {
+    console.error("[AdminDashboard] error", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load admin dashboard",
+    });
+  }
+};
+
+const getAdminTransactions = async (req, res) => {
+  try {
+    const {
+      status = "all",
+      dateRange = "all",
+      page = 1,
+      limit = 12,
+    } = req.query;
+
+    const match = {};
+
+    // status filter
+    if (status !== "all") {
+      match.status = status;
+    }
+
+    // date fillter
+    const now = new Date();
+    let startDate = null;
+
+    switch (dateRange) {
+      case "today":
+        startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "week":
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "quarter":
+        const quarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), quarter * 3, 1);
+        break;
+    }
+
+    if (startDate) {
+      match.createdAt = { $gte: startDate };
+    }
+
+    const skip = (page - 1) * limit;
+
+    // transactions
+    const transactions = await Payment.find(match)
+      .populate("user", "firstName lastName")
+      .populate("course", "title")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const totalCount = await Payment.countDocuments(match);
+
+    // stats
+    const statsAgg = await Payment.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "success"] }, "$amount", 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalRevenue: statsAgg[0]?.totalRevenue || 0,
+        },
+        transactions,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[AdminTransactions]", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load transactions",
+    });
+  }
+};
 
 export {
   approveCourse,
   rejectCourse,
   getAdminUsers,
-  getUserGrowthAnalytics,
-  getCoursePerformanceAnalytics,
-  getPlatformRevenueAnalytics,
-  getEnrollmentTrendsAnalytics,
-  getUserAnalytics,
-  getCourseAnalytics,
-  getRevenueAnalytics,
-  getEnrollmentAnalytics,
+  getAdminDashboard,
   updateUserStatus,
   deleteUserByAdmin,
+  getAdminTransactions,
 };
