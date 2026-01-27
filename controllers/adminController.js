@@ -540,7 +540,7 @@ const getAdminTransactions = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[AdminTransactions]", error.message);
+    console.error("AdminTransactions", error.message);
     return res.status(500).json({
       success: false,
       message: "Failed to load transactions",

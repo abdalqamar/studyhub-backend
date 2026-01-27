@@ -18,7 +18,7 @@ const createCategory = async (req, res) => {
 
     const uploadResult = await uploadOnCloudinary(
       localFile,
-      process.env.FOLDER_NAME
+      process.env.FOLDER_NAME,
     );
 
     if (!uploadResult || !uploadResult.secure_url) {
@@ -80,7 +80,7 @@ const updateCategory = async (req, res) => {
     const { name, description } = req.body;
     const localFile = req.file ? req.file.path : null;
 
-    // At-least-one-field validation
+    // Check if at least one field is provided
     if (!name && !description && !localFile && req.body.image !== "") {
       return res.status(400).json({
         success: false,
@@ -114,7 +114,7 @@ const updateCategory = async (req, res) => {
     } else if (localFile) {
       const uploadResult = await uploadOnCloudinary(
         localFile,
-        process.env.FOLDER_NAME
+        process.env.FOLDER_NAME,
       );
 
       if (!uploadResult || !uploadResult.secure_url) {
@@ -219,7 +219,7 @@ const getAllCategories = async (req, res) => {
         },
       },
       {
-        $sort: { trending: -1, createdAt: -1 }, // Trending first, then newest
+        $sort: { trending: -1, createdAt: -1 },
       },
     ]);
 

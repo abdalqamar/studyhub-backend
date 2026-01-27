@@ -4,7 +4,6 @@ import Lesson from "../models/lessonModal.js";
 import Section from "../models/sectionModal.js";
 import User from "../models/userModal.js";
 import CourseProgress from "../models/courseProgressModal.js";
-
 import mongoose from "mongoose";
 import {
   deleteFromCloudinary,
@@ -16,7 +15,7 @@ const createCourse = async (req, res) => {
     if (req.user.role !== "instructor" && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: "Only instructors or admins can create a course",
+        message: "Only instructors  can create a course",
       });
     }
     const {
@@ -31,6 +30,7 @@ const createCourse = async (req, res) => {
       instructions,
     } = req.body;
 
+    // check mandatory fields
     if (
       !title?.trim() ||
       !description?.trim() ||
@@ -44,6 +44,7 @@ const createCourse = async (req, res) => {
       });
     }
 
+    // Validate price
     const parsedPrice = Number(price);
     if (isNaN(parsedPrice) || parsedPrice < 0) {
       return res.status(400).json({
@@ -119,7 +120,6 @@ const createCourse = async (req, res) => {
     });
   } catch (error) {
     console.error("Course creation error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Course creation failed",
@@ -137,6 +137,8 @@ const deleteCourse = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Course Id is required" });
     }
+
+    //check if course exists
 
     const course = await Course.findById(id);
     if (!course) {
@@ -183,6 +185,7 @@ const deleteCourse = async (req, res) => {
   }
 };
 
+// for public users, (jiska status approved ho)
 const getPublicCourses = async (req, res) => {
   try {
     const { search, category, page = 1, limit = 12 } = req.query;
@@ -286,6 +289,7 @@ const calculateCourseDuration = async (courseContent = []) => {
   return `${hours}h ${minutes}m`;
 };
 
+// for instructors and admins (unke dashboard ke liye)
 const fetchAllCourses = async (req, res) => {
   try {
     const { role, id: userId } = req.user;
@@ -396,6 +400,7 @@ const fetchAllCourses = async (req, res) => {
   }
 };
 
+// single course by id (for instructors and admins)
 const getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -433,7 +438,7 @@ const getCourseById = async (req, res) => {
   }
 };
 
-// Helper to prepare updates
+// Helper to prepare updates for courses
 function prepareUpdates(body, thumbnailUrl) {
   const updates = {};
 
@@ -483,6 +488,7 @@ function prepareUpdates(body, thumbnailUrl) {
   return updates;
 }
 
+// for course preview (admin and instructors)
 const getCoursePreview = async (req, res) => {
   try {
     const { id } = req.params;
@@ -594,6 +600,7 @@ const getCoursePreview = async (req, res) => {
   }
 };
 
+// course details for public users
 const getCourseDetails = async (req, res) => {
   try {
     const { id } = req.params;
@@ -803,7 +810,7 @@ const updateCourse = async (req, res) => {
       });
     }
 
-    // Auto-reset status if rejected
+    // Auto reset status if rejected
     if (course.status === "rejected") {
       req.body.status = "pending";
       req.body.feedback = "";
@@ -811,7 +818,7 @@ const updateCourse = async (req, res) => {
 
     // Thumbnail file
     const localFile = req.files?.courseThumbnail?.[0] || null;
-    const oldThumbnailUrl = course.thumbnail; // secure_url only
+    const oldThumbnailUrl = course.thumbnail;
 
     let thumbnailUrl = null;
 
@@ -823,10 +830,10 @@ const updateCourse = async (req, res) => {
       if (uploadResult) thumbnailUrl = uploadResult.secure_url;
     }
 
-    // Build updates
+    // prepare updates
     const updates = prepareUpdates(req.body, thumbnailUrl);
 
-    // Validate category if changing
+    // Validate category if updating
     if (updates.category && updates.category !== course.category.toString()) {
       const cat = await Category.findById(updates.category);
       if (!cat) {
@@ -840,7 +847,7 @@ const updateCourse = async (req, res) => {
     Object.assign(course, updates);
     await course.save();
 
-    // Delete old thumbnail (URL-based, same as category)
+    // Delete old thumbnail from Cloudinary
     if (localFile && oldThumbnailUrl) {
       try {
         await deleteFromCloudinary(oldThumbnailUrl);

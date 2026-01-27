@@ -7,12 +7,15 @@ import Course from "../models/courseModal.js";
 const updateProfile = async (req, res) => {
   try {
     const id = req.user.id;
+
+    // Destructure fields from req.body
     const { firstName, lastName, dateOfBirth, contactNumber, about, gender } =
       req.body;
 
+    // At least one field is required to update
     if (
       ![firstName, lastName, dateOfBirth, contactNumber, about, gender].some(
-        Boolean
+        Boolean,
       )
     ) {
       return res.status(400).json({
@@ -43,7 +46,7 @@ const updateProfile = async (req, res) => {
         contactNumber,
         about,
       },
-      { new: true }
+      { new: true },
     );
 
     return res.status(200).json({
@@ -57,7 +60,6 @@ const updateProfile = async (req, res) => {
         dateOfBirth: updatedProfile.dateOfBirth,
         contactNumber: updatedProfile.contactNumber,
         about: updatedProfile.about,
-        role: user.role,
       },
     });
   } catch (error) {
@@ -82,7 +84,7 @@ const updateProfileImage = async (req, res) => {
     }
     const uploadResult = await uploadOnCloudinary(
       image.path,
-      process.env.FOLDER_NAME
+      process.env.FOLDER_NAME,
     );
 
     const user = await User.findById(id);
@@ -95,7 +97,7 @@ const updateProfileImage = async (req, res) => {
     const updatedProfile = await Profile.findByIdAndUpdate(
       profileId,
       { profileImage: uploadResult.secure_url },
-      { new: true }
+      { new: true },
     );
     return res.status(200).json({
       success: true,
@@ -110,6 +112,7 @@ const updateProfileImage = async (req, res) => {
   }
 };
 
+// Get user details for there profile
 const getUserDetails = async (req, res) => {
   try {
     const { id } = req.user;
@@ -146,6 +149,7 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+// For getting enrolled courses of user
 const getEnrolledCourses = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -168,7 +172,7 @@ const getEnrolledCourses = async (req, res) => {
 
     const enrolledCourses = user.enrolledCourses;
 
-    // Run all courses in parallel (faster)
+    // Fetch course progress and there progress percentage
     const coursesWithProgress = await Promise.all(
       enrolledCourses.map(async (course) => {
         const fullCourse = await Course.findById(course._id)
@@ -189,14 +193,14 @@ const getEnrolledCourses = async (req, res) => {
         if (!fullCourse) return null;
 
         const allLessons = fullCourse.courseContent.flatMap(
-          (section) => section.lesson || []
+          (section) => section.lesson || [],
         );
 
         const totalLessons = allLessons.length;
 
         const totalMinutes = allLessons.reduce(
           (sum, lesson) => sum + (lesson?.duration || 0),
-          0
+          0,
         );
 
         const hours = Math.floor(totalMinutes / 60);
@@ -227,7 +231,7 @@ const getEnrolledCourses = async (req, res) => {
             fullCourse.instructor?.lastName || ""
           }`.trim(),
         };
-      })
+      }),
     );
 
     return res.status(200).json({

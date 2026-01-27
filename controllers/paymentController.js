@@ -96,7 +96,7 @@ const enrollStudent = async (payment) => {
 
   const { userId, courseIds } = notes;
 
-  // fetch user & courses (NO session)
+  // fetch user and courses
   const [user, courses] = await Promise.all([
     User.findById(userId),
     Course.find({ _id: { $in: courseIds } }),
@@ -105,7 +105,7 @@ const enrollStudent = async (payment) => {
   if (!user) throw new Error("User not found");
   if (courses.length !== courseIds.length) throw new Error("Course mismatch");
 
-  // skip already enrolled courses
+  // skip if already enrolled in courses
   const enrolledSet = new Set(
     (user.enrolledCourses || []).map((id) => id.toString()),
   );
@@ -138,7 +138,6 @@ const enrollStudent = async (payment) => {
 };
 
 // Email senders
-
 const sendEnrollmentEmail = (user, payment, titles) =>
   setImmediate(async () => {
     try {

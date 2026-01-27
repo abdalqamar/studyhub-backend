@@ -6,6 +6,7 @@ import {
 } from "../utils/cloudinary.js";
 import Course from "../models/courseModal.js";
 
+// For creating lectures
 const createLesson = async (req, res) => {
   try {
     const { title, description } = req.body;
@@ -37,7 +38,7 @@ const createLesson = async (req, res) => {
     // Upload video
     const uploadResult = await uploadOnCloudinary(
       videoFile.path,
-      process.env.FOLDER_NAME
+      process.env.FOLDER_NAME,
     );
     if (!uploadResult) {
       return res
@@ -55,20 +56,18 @@ const createLesson = async (req, res) => {
       description,
       videoUrl: uploadResult.secure_url,
       duration: durationInMinutes,
-      publicId: uploadResult.public_id,
     });
 
     await Section.findByIdAndUpdate(
       sectionId,
       { $push: { lesson: lesson._id } },
-      { new: true }
+      { new: true },
     ).populate("lesson");
 
     return res.status(201).json({
       success: true,
       message: "Lesson created successfully",
       newLesson: lesson,
-      sectionId,
     });
   } catch (error) {
     console.error(" Error creating lesson:", error);
@@ -125,7 +124,7 @@ const updateLesson = async (req, res) => {
 
       const uploadResult = await uploadOnCloudinary(
         videoFile.path,
-        process.env.FOLDER_NAME
+        process.env.FOLDER_NAME,
       );
       if (!uploadResult) {
         return res
@@ -146,7 +145,7 @@ const updateLesson = async (req, res) => {
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     // Delete old video from Cloudinary
@@ -162,8 +161,6 @@ const updateLesson = async (req, res) => {
       success: true,
       message: "Lesson updated successfully",
       updatedLesson,
-      sectionId,
-      lessonId,
     });
   } catch (error) {
     console.error("Error updating lesson:", error);
@@ -213,7 +210,7 @@ const deleteLesson = async (req, res) => {
     // Delete lesson from database
     await Lesson.findByIdAndDelete(lessonId);
 
-    // Return only IDs in response
+    // Return  response
     return res.status(200).json({
       success: true,
       message: "Lesson deleted successfully",

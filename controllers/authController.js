@@ -32,7 +32,7 @@ const sendOtp = async (req, res) => {
 
     if (lastOtp && Date.now() - lastOtp.createdAt.getTime() < OTP_INTERVAL) {
       const waitTime = Math.ceil(
-        (OTP_INTERVAL - (Date.now() - lastOtp.createdAt.getTime())) / 1000
+        (OTP_INTERVAL - (Date.now() - lastOtp.createdAt.getTime())) / 1000,
       );
       return res.status(400).json({
         success: false,
@@ -63,9 +63,11 @@ const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, confirmPassword, otp } =
       req.body;
+
+    // data from req body
     if (
       [firstName, email, password, confirmPassword, otp].some(
-        (field) => field?.trim() === ""
+        (field) => field?.trim() === "",
       )
     ) {
       return res.status(400).json({
@@ -73,6 +75,8 @@ const register = async (req, res) => {
         message: "All fields are required",
       });
     }
+
+    // check user exists
     const existUser = await User.findOne({ email });
     if (existUser) {
       return res.status(401).json({
@@ -81,6 +85,8 @@ const register = async (req, res) => {
       });
     }
 
+    // match passwords
+
     if (password !== confirmPassword) {
       return res.status(401).json({
         success: false,
@@ -88,6 +94,7 @@ const register = async (req, res) => {
       });
     }
 
+    // check valid otp
     const validOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
 
     if (validOtp.otp !== req.body.otp) {
@@ -103,7 +110,7 @@ const register = async (req, res) => {
       contactNumber: null,
       about: null,
       profileImage: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(
-        `${firstName} ${lastName}`
+        `${firstName} ${lastName}`,
       )}`,
     });
 
@@ -141,7 +148,7 @@ const login = async (req, res) => {
 
     const user = await User.findOne({ email }).populate(
       "additionalInformation",
-      "profileImage"
+      "profileImage",
     );
 
     if (!user) {
@@ -176,7 +183,7 @@ const login = async (req, res) => {
 
     user.refreshTokens = user.refreshTokens.filter(
       (token) =>
-        token.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000 > Date.now()
+        token.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000 > Date.now(),
     );
 
     // Save refresh token in DB
@@ -241,7 +248,7 @@ const logout = async (req, res) => {
       {
         $pull: { refreshTokens: { token: refreshToken } },
         $set: { status: "inactive" },
-      }
+      },
     );
 
     res.clearCookie("refreshToken", { httpOnly: true });
@@ -296,7 +303,7 @@ const forgotPassword = async (req, res) => {
     await sendEmail(
       email,
       "Reset Your Password - StudyHub (Valid for 5 minutes)",
-      resetPasswordTemplate(email, user.fullName, url)
+      resetPasswordTemplate(email, user.firstName, url),
     );
 
     return res.status(200).json({
@@ -355,7 +362,7 @@ const resetPassword = async (req, res) => {
     await sendEmail(
       user.email,
       "Password Updated Successfully - StudyHub",
-      passwordUpdateTemplate(user.email, user.fullName)
+      passwordUpdateTemplate(user.email, user.firstName),
     );
 
     return res.status(200).json({
@@ -401,7 +408,7 @@ const changePassword = async (req, res) => {
     const mailResponse = await sendEmail(
       user.email,
       "Password update email",
-      passwordUpdateTemplate(user.email, user.fullName)
+      passwordUpdateTemplate(user.email, user.firstName),
     );
 
     return res.status(200).json({ message: "Password updated successfully" });
@@ -453,10 +460,10 @@ const refreshToken = async (req, res) => {
       role: user.role,
     });
 
-    //  update(rotate) user's refresh tokens in DB
+    // rotate users refresh tokens in DB
     await User.updateOne(
       { _id: user._id },
-      { $pull: { refreshTokens: { token: refreshTokenCookie } } }
+      { $pull: { refreshTokens: { token: refreshTokenCookie } } },
     );
 
     await User.updateOne(
@@ -468,7 +475,7 @@ const refreshToken = async (req, res) => {
             $slice: -3,
           },
         },
-      }
+      },
     );
 
     const isProd = process.env.NODE_ENV === "production";

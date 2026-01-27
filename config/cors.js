@@ -13,7 +13,7 @@ if (!isProd) {
 
 export default {
   origin: (origin, callback) => {
-    // Postman / server-to-server requests
+    // Postman
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
