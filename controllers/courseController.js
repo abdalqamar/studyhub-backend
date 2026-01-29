@@ -371,6 +371,8 @@ const fetchAllCourses = async (req, res) => {
           enrolledCount: course.enrolledStudents?.length || 0,
           averageRating: course.averageRating || 0,
           duration: await calculateCourseDuration(course.courseContent),
+          feedback: course.feedback || "",
+          updatedAt: course.updatedAt,
         })),
       );
 
@@ -443,7 +445,7 @@ function prepareUpdates(body, thumbnailUrl) {
   const updates = {};
 
   // String fields
-  const stringFields = ["title", "description", "requirements"];
+  const stringFields = ["title", "description"];
   stringFields.forEach((f) => {
     if (body[f]?.trim()) updates[f] = body[f].trim();
   });
@@ -456,8 +458,8 @@ function prepareUpdates(body, thumbnailUrl) {
       .filter(Boolean);
   }
 
-  // Array fields (tags, whatYouWillLearn)
-  ["tags", "whatYouWillLearn"].forEach((f) => {
+  // Array fields (tags, whatYouWillLearn, requirements)
+  ["tags", "whatYouWillLearn", "requirements"].forEach((f) => {
     if (!body[f]) return;
     if (typeof body[f] === "string") {
       updates[f] = body[f]
@@ -475,7 +477,7 @@ function prepareUpdates(body, thumbnailUrl) {
     if (!isNaN(p) && p >= 0) updates.price = p;
   }
 
-  // Thumbnail (only URL)
+  // Thumbnail
   if (thumbnailUrl) updates.thumbnail = thumbnailUrl;
 
   // Category
