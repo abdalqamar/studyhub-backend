@@ -1,14 +1,13 @@
 const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
-  // format amount safely
   const formattedAmount = Number(amount).toLocaleString("en-IN");
 
   const coursesList = courses
     .map(
       (course) => `
-        <li style="margin: 12px 0; padding-left: 5px; text-align: left; color: #333333;">
+        <li style="margin: 12px 0; padding-left: 5px; text-align: left; color: #1e40af;">
           ${course}
         </li>
-      `
+      `,
     )
     .join("");
 
@@ -21,74 +20,72 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
 
   <style>
     body {
-      background-color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       margin: 0;
       padding: 0;
-      color: #333333;
+      font-family: Arial, sans-serif;
+      background-color: #e8f4f8;
     }
 
     .container {
       max-width: 600px;
       margin: 0 auto;
-      background-color: #ffffff;
+      background-color: #e8f4f8;
+      padding: 40px 20px;
     }
 
-    .header {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-      padding: 40px 20px;
-      text-align: center;
+    .logo-section {
+      text-align: left;
+      margin-bottom: 40px;
     }
 
     .logo {
-      max-width: 180px;
+      max-width: 150px;
+    }
+
+    .content-box {
+      background-color: #d4e8f0;
+      border-radius: 12px 12px 0 0;
+      padding: 60px 40px;
+      text-align: center;
+    }
+
+    .celebration-icon {
+      font-size: 80px;
       margin-bottom: 20px;
     }
 
-    .header-title {
-      color: #ffffff;
-      font-size: 28px;
+    h1 {
+      color: #1e40af;
+      font-size: 36px;
       font-weight: bold;
-      margin: 0;
-    }
-
-    .content {
-      padding: 40px 30px;
-    }
-
-    .success-badge {
-      background-color: #10b981;
-      color: #ffffff;
-      display: inline-block;
-      padding: 10px 24px;
-      border-radius: 25px;
-      font-weight: 600;
-      margin-bottom: 24px;
+      line-height: 1.3;
+      margin: 0 0 30px 0;
     }
 
     .greeting {
+      color: #1e40af;
       font-size: 22px;
+      margin-bottom: 15px;
       font-weight: 700;
-      margin-bottom: 16px;
-      color: #1f2937;
     }
 
-    .message {
-      color: #4b5563;
-      margin-bottom: 32px;
-      line-height: 1.7;
+    .subtitle {
+      color: #1e40af;
+      font-size: 18px;
+      line-height: 1.6;
+      margin-bottom: 30px;
     }
 
     .info-box {
-      background-color: #f9fafb;
-      border: 1px solid #e5e7eb;
+      background-color: #ffffff;
       border-radius: 8px;
-      padding: 24px;
-      margin: 24px 0;
+      padding: 20px;
+      margin: 20px 0;
+      text-align: left;
     }
 
     .info-row {
-      padding: 12px 0;
+      padding: 10px 0;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -105,6 +102,7 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
     .info-value {
       font-weight: 600;
       color: #1f2937;
+      margin-top: 5px;
       word-break: break-all;
     }
 
@@ -114,57 +112,99 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
     }
 
     .courses-section {
-      margin: 32px 0;
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .courses-title {
+      color: #1e40af;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
     }
 
     .courses-list {
       background-color: #eff6ff;
       border: 1px solid #bfdbfe;
-      padding: 20px 20px 20px 40px;
+      padding: 15px 15px 15px 35px;
       border-radius: 8px;
+      margin: 0;
     }
 
-    .enrollment-banner {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: #ffffff;
+    .cta-box {
+      background-color: #2563eb;
+      border-radius: 0 0 12px 12px;
+      padding: 50px 40px;
       text-align: center;
-      padding: 32px 24px;
-      border-radius: 12px;
-      margin: 32px 0;
+      color: white;
     }
 
-    .cta {
+    .cta-text {
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 30px;
+    }
+
+    .button {
       display: inline-block;
-      padding: 16px 48px;
-      background-color: #ffffff;
+      background-color: white;
       color: #2563eb;
+      padding: 15px 50px;
       text-decoration: none;
       border-radius: 30px;
-      font-weight: 700;
-      margin-top: 24px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .social-icons {
+      text-align: center;
+      margin-top: 40px;
+      margin-bottom: 20px;
+    }
+
+    .social-icon {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      margin: 0 8px;
+      background-color: #3b82f6;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 40px;
+      color: white;
+      text-decoration: none;
+      font-size: 18px;
     }
 
     .footer {
-      background-color: #f9fafb;
-      padding: 32px 30px;
       text-align: center;
-      border-top: 1px solid #e5e7eb;
+      margin-top: 20px;
+      color: #1e40af;
+      font-size: 13px;
     }
 
-    .support {
-      font-size: 14px;
-      color: #6b7280;
-    }
-
-    .support a {
-      color: #3b82f6;
-      font-weight: 600;
+    .footer a {
+      color: #2563eb;
       text-decoration: none;
     }
 
+    .copyright {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
     @media only screen and (max-width: 600px) {
-      .content {
-        padding: 30px 20px;
+      .content-box {
+        padding: 40px 20px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .cta-box {
+        padding: 40px 20px;
       }
     }
   </style>
@@ -172,18 +212,19 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
 
 <body>
   <div class="container">
-    <div class="header">
+    <div class="logo-section">
       <img class="logo" src="https://res.cloudinary.com/du7xquzsm/image/upload/v1767602264/svgviewer-png-output_zldy0l.png" alt="StudyHub Logo" />
-      <p class="header-title">Payment Successful!</p>
     </div>
 
-    <div class="content">
-      <div class="success-badge">✓ Purchase Confirmed</div>
-
-      <div class="greeting">Dear ${name},</div>
-
-      <div class="message">
-        Thank you for your purchase! Your payment has been successfully processed and your enrollment is now complete.
+    <div class="content-box">
+      <div class="celebration-icon">🎉</div>
+      
+      <h1>Congratulations on the start of your thrilling learning adventure!</h1>
+      
+      <div class="greeting">Hello ${name}!</div>
+      
+      <div class="subtitle">
+        You have successfully enrolled! We couldn't be more excited to have you join us!
       </div>
 
       <div class="info-box">
@@ -204,29 +245,31 @@ const enrollmentEmailTemplate = (name, amount, orderId, paymentId, courses) => {
       </div>
 
       <div class="courses-section">
-        <h3>📚 Your Enrolled Courses</h3>
+        <div class="courses-title">📚 Your Enrolled Courses</div>
         <ul class="courses-list">
           ${coursesList}
         </ul>
       </div>
+    </div>
 
-      <div class="enrollment-banner">
-        <h2>🎉 You Are Now Enrolled!</h2>
-        <p>You can start learning immediately. Access your courses anytime, anywhere.</p>
+    <div class="cta-box">
+      <div class="cta-text">
+        Your journey begins today! The first lesson is already waiting for you on our platform.
       </div>
+      
+      <a href="https://studyhubedu.online/" class="button">Start Learning Now</a>
+    </div>
 
-      <div style="text-align:center;">
-        <a href="https://studyhub-edtech-project.vercel.app/dashboard" class="cta">
-          Start Learning Now →
-        </a>
-      </div>
+    <div class="social-icons">
+      <a href="#" class="social-icon">f</a>
+      <a href="#" class="social-icon">𝕏</a>
+      <a href="#" class="social-icon">in</a>
+      <a href="#" class="social-icon">▶</a>
     </div>
 
     <div class="footer">
-      <div class="support">
-        Need help? Contact us at
-        <a href="mailto:info@studyhubedu.online">info@studyhubedu.online</a>
-      </div>
+      Need help? Contact us at <a href="mailto:info@studyhubedu.online">info@studyhubedu.online</a>
+      <div class="copyright">© Copyright, 2025 StudyHub</div>
     </div>
   </div>
 </body>

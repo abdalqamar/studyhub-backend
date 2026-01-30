@@ -812,10 +812,10 @@ const updateCourse = async (req, res) => {
       });
     }
 
-    // Auto reset status if rejected
+    // reset status if rejected
     if (course.status === "rejected") {
-      req.body.status = "pending";
-      req.body.feedback = "";
+      course.status = "pending";
+      course.feedback = "";
     }
 
     // Thumbnail file
