@@ -118,7 +118,7 @@ const getUserDetails = async (req, res) => {
     const { id } = req.user;
     const user = await User.findById(id)
       .populate("additionalInformation")
-      .select("firstName lastName email role ");
+      .select("firstName lastName email role lastActive ");
     if (!user) {
       return res
         .status(404)
@@ -130,6 +130,7 @@ const getUserDetails = async (req, res) => {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
+      lastActive: user.lastActive,
       gender: user.additionalInformation?.gender || null,
       contactNumber: user.additionalInformation?.contactNumber || null,
       about: user.additionalInformation?.about || null,
@@ -142,7 +143,6 @@ const getUserDetails = async (req, res) => {
       user: userData,
     });
   } catch (error) {
-    console.log(error);
     return res
       .status(500)
       .json({ success: false, message: "Server error", error: error.message });
