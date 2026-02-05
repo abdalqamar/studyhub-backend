@@ -18,7 +18,7 @@ const app = express();
 app.post(
   "/api/v1/payment/webhook",
   express.raw({ type: "application/json" }),
-  razorpayWebhook
+  razorpayWebhook,
 );
 // Middleware
 app.use(express.json());
@@ -28,7 +28,6 @@ app.use(cookieParser());
 
 // CORS setup
 app.use(cors(corsConfig));
-//
 
 // Database connection
 database();

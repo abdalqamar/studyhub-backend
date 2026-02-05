@@ -51,7 +51,7 @@ router.get("/", getPublicCourses);
 // ADMIN / INSTRUCTOR DASHBOARD
 router.get("/manage", isAuthenticated, fetchAllCourses);
 
-//  COURSE VIEW ROUTES (
+//  COURSE VIEW ROUTES
 
 // Course preview (logged-in users)
 router.get("/:id/preview", isAuthenticated, getCoursePreview);
@@ -64,7 +64,7 @@ router.get("/:id", getCourseDetails);
 
 //  REVIEWS
 router.put("/:id/reviews", isAuthenticated, updateReview);
-router.delete("/:id/reviews", isAuthenticated, deleteReview);
+router.delete("/:id/reviews", deleteReview);
 router.post("/:id/reviews", isAuthenticated, createReview);
 
 // INSTRUCTOR COURSE CRUD ROUTES

@@ -402,7 +402,7 @@ const fetchAllCourses = async (req, res) => {
   }
 };
 
-// single course by id (for instructors and admins)
+// single course by id
 const getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -427,6 +427,7 @@ const getCourseById = async (req, res) => {
       .populate("enrolledStudents")
       .populate("category", "name");
 
+    console.log(populatedCourse);
     return res.status(200).json({
       success: true,
       message: "Course details get succesfully",
@@ -626,6 +627,7 @@ const getCourseDetails = async (req, res) => {
       })
       .populate({
         path: "ratingAndReviews",
+        options: { sort: { createdAt: -1 } },
         populate: {
           path: "user",
           select: "firstName lastName email additionalInformation",
@@ -658,26 +660,16 @@ const getCourseDetails = async (req, res) => {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = Math.round(totalMinutes % 60);
 
-    // Ratings
-    const ratings = course.ratingAndReviews || [];
-    const totalRating = ratings.reduce((sum, r) => sum + (r.rating || 0), 0);
-    const averageRating = ratings.length
-      ? Number((totalRating / ratings.length).toFixed(1))
-      : 0;
-
-    // Reviews formatting
-    const formattedReviews = ratings.map((r) => ({
+    const formattedReviews = course.ratingAndReviews.map((r) => ({
       _id: r._id,
       rating: r.rating,
       review: r.review,
-      user: r.user
-        ? {
-            _id: r.user._id,
-            name: `${r.user.firstName} ${r.user.lastName}`,
-            email: r.user.email,
-            profileImage: r.user.additionalInformation?.profileImage || null,
-          }
-        : null,
+      createdAt: r.createdAt,
+      user: {
+        profileImage: r.user?.additionalInformation?.profileImage || null,
+        _id: r.user?._id,
+        name: `${r.user?.firstName || ""} ${r.user?.lastName || ""}`.trim(),
+      },
     }));
 
     // Final Response
@@ -693,7 +685,7 @@ const getCourseDetails = async (req, res) => {
         category: course.category,
         price: course.price,
         thumbnail: course.thumbnail,
-        averageRating,
+        averageRating: course.averageRating || 0,
         totalStudents: course.enrolledStudents?.length || 0,
         totalLectures: allLessons.length,
         totalDuration: `${hours}h ${minutes}m`,

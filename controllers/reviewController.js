@@ -1,29 +1,41 @@
+import mongoose from "mongoose";
 import Course from "../models/courseModal.js";
 import RatingAndReviews from "../models/ratingAndRewiews.js";
 
+// For create review
 const createReview = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { rating, review, courseId } = req.body;
+    const courseId = req.params.id;
+    const { rating, review } = req.body;
+
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5",
+      });
+    }
 
     // Check enrollment
     const courseDetails = await Course.findOne({
       _id: courseId,
-      enrolledStudents: { $elemMatch: { $eq: userId } },
+      enrolledStudents: userId,
     });
 
     if (!courseDetails) {
-      return res.status(404).json({
+      return res.status(403).json({
         success: false,
         message: "You are not enrolled in this course.",
       });
     }
 
-    // Check duplicate review
+    // Prevent duplicate review
     const alreadyReviewed = await RatingAndReviews.findOne({
       user: userId,
       course: courseId,
     });
+
     if (alreadyReviewed) {
       return res.status(403).json({
         success: false,
@@ -31,7 +43,7 @@ const createReview = async (req, res) => {
       });
     }
 
-    // Create new review
+    // Create review
     const newReview = await RatingAndReviews.create({
       rating,
       review,
@@ -39,36 +51,110 @@ const createReview = async (req, res) => {
       user: userId,
     });
 
-    // Push review ID to course
-    await Course.findByIdAndUpdate(
-      courseId,
-      { $push: { ratingAndReviews: newReview._id } },
-      { new: true }
-    );
+    // Attach review to course
+    await Course.findByIdAndUpdate(courseId, {
+      $push: { ratingAndReviews: newReview._id },
+    });
 
     // Recalculate average rating
-    const allReviews = await RatingAndReviews.find({ course: courseId });
-    const avgRating =
-      allReviews.reduce((acc, r) => acc + r.rating, 0) / allReviews.length;
+    const avgResult = await RatingAndReviews.aggregate([
+      {
+        $match: {
+          course: new mongoose.Types.ObjectId(courseId),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+        },
+      },
+    ]);
 
-    await Course.findByIdAndUpdate(courseId, { averageRating: avgRating });
+    const averageRating =
+      avgResult.length > 0
+        ? Number(avgResult[0].averageRating.toFixed(1))
+        : rating;
 
-    return res.status(200).json({
+    await Course.findByIdAndUpdate(courseId, {
+      averageRating,
+    });
+
+    return res.status(201).json({
       success: true,
-      message: "Rating and review added successfully.",
+      message: "Rating and review added successfully",
       data: newReview,
     });
   } catch (error) {
     console.error("Error creating rating:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Something went wrong",
     });
   }
 };
 
-const getReviewsByCourse = async (req, res) => {};
-const updateReview = async (req, res) => {};
-const deleteReview = async (req, res) => {};
+// Delete review controller
+const deleteReview = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-export { createReview, getReviewsByCourse, updateReview, deleteReview };
+    // Review find karo
+    const review = await RatingAndReviews.findById(id);
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found",
+      });
+    }
+
+    const courseId = review.course;
+
+    //  Review delete karo
+    await RatingAndReviews.findByIdAndDelete(id);
+
+    // Course se review id hatao
+    await Course.findByIdAndUpdate(courseId, {
+      $pull: { ratingAndReviews: id },
+    });
+
+    //  Average dobara calculate karo
+    const avgResult = await RatingAndReviews.aggregate([
+      {
+        $match: {
+          course: courseId,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+        },
+      },
+    ]);
+
+    const averageRating =
+      avgResult.length > 0 ? Number(avgResult[0].averageRating.toFixed(1)) : 0;
+
+    // Course update karo
+    await Course.findByIdAndUpdate(courseId, {
+      averageRating,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Review deleted & average rating updated",
+    });
+  } catch (error) {
+    console.error("Delete review error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+    });
+  }
+};
+
+// update review controller
+const updateReview = async (req, res) => {};
+
+export { createReview, updateReview, deleteReview };

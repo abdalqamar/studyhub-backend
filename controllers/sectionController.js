@@ -86,7 +86,7 @@ const updateSection = async (req, res) => {
     const updatedSection = await Section.findByIdAndUpdate(
       sectionId,
       { sectionName },
-      { new: true }
+      { new: true },
     ).populate("lesson");
 
     if (!updatedSection) {
