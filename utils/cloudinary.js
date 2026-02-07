@@ -3,6 +3,8 @@ import fs from "fs/promises";
 import dotenv from "dotenv";
 dotenv.config();
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
@@ -12,7 +14,7 @@ cloudinary.config({
 // Upload function
 const uploadOnCloudinary = async (
   localFilePath,
-  folder = process.env.FOLDER_NAME
+  folder = process.env.FOLDER_NAME,
 ) => {
   try {
     if (!localFilePath) return null;
@@ -24,7 +26,7 @@ const uploadOnCloudinary = async (
     });
 
     await fs.unlink(localFilePath).catch((err) => {
-      console.error("Failed to delete temp file:", err);
+      if (isDevelopment) console.error("Failed to delete temp file:", err);
     });
 
     return {
@@ -35,14 +37,15 @@ const uploadOnCloudinary = async (
       duration: result.duration ?? null,
     };
   } catch (error) {
-    console.log("Cloudinary Upload Error:", error);
+    if (isDevelopment) console.log("Cloudinary Upload Error:", error);
 
     if (localFilePath) {
       await fs.unlink(localFilePath).catch((unlinkErr) => {
-        console.error(
-          "Failed to delete temp file after upload failure:",
-          unlinkErr
-        );
+        if (isDevelopment)
+          console.log(
+            "Failed to delete temp file after upload failure:",
+            unlinkErr,
+          );
       });
     }
 
@@ -65,8 +68,8 @@ const deleteFromCloudinary = async (secureUrl) => {
     const resourceType = secureUrl.includes("/image/")
       ? "image"
       : secureUrl.includes("/video/")
-      ? "video"
-      : "raw";
+        ? "video"
+        : "raw";
 
     const result = await cloudinary.uploader.destroy(fullPublicId, {
       resource_type: resourceType,
@@ -74,7 +77,7 @@ const deleteFromCloudinary = async (secureUrl) => {
 
     return result.result === "ok" || result.result === "not found";
   } catch (err) {
-    console.error("Cloudinary delete error:", err.message);
+    if (isDevelopment) console.log("Cloudinary delete error:", err.message);
     return false;
   }
 };
