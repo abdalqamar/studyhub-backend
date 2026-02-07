@@ -10,6 +10,17 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
+// Environment & Constants
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+// Helper to calculate lesson duration and total minutes
+const calculateLessonStats = (lessons = []) => {
+  const totalMinutes = lessons.reduce((sum, l) => sum + (l.duration || 0), 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return { totalMinutes, hours, minutes };
+};
+
 const createCourse = async (req, res) => {
   try {
     if (req.user.role !== "instructor" && req.user.role !== "admin") {
@@ -119,11 +130,11 @@ const createCourse = async (req, res) => {
       course: newCourse,
     });
   } catch (error) {
-    console.error("Course creation error:", error);
+    if (isDevelopment) console.error("Course creation error:", error);
     return res.status(500).json({
       success: false,
       message: "Course creation failed",
-      error: error.message,
+      error: isDevelopment ? error.message : undefined,
     });
   }
 };
@@ -153,7 +164,8 @@ const deleteCourse = async (req, res) => {
       try {
         await deleteFromCloudinary(thumbnailUrl);
       } catch (err) {
-        console.error("Thumbnail delete failed:", err.message);
+        if (isDevelopment)
+          console.error("Thumbnail delete failed:", err.message);
       }
     }
 
@@ -180,7 +192,7 @@ const deleteCourse = async (req, res) => {
       data: {},
     });
   } catch (error) {
-    console.error("Error deleting course:", error.message);
+    if (isDevelopment) console.error("Error deleting course:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -225,14 +237,7 @@ const getPublicCourses = async (req, res) => {
 
     const formattedCourses = courses.map((course) => {
       const lessons = course.courseContent.flatMap((sec) => sec.lesson || []);
-
-      const totalMinutes = lessons.reduce(
-        (sum, l) => sum + (l.duration || 0),
-        0,
-      );
-
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
+      const { hours, minutes } = calculateLessonStats(lessons);
 
       return {
         _id: course._id,
@@ -263,30 +268,12 @@ const getPublicCourses = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching public courses:", error);
+    if (isDevelopment) console.error("Error fetching public courses:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch courses",
     });
   }
-};
-
-// helper function to calculate course duration
-const calculateCourseDuration = async (courseContent = []) => {
-  if (!courseContent.length) return "0h 0m";
-
-  const sections = await Section.find({
-    _id: { $in: courseContent },
-  }).populate("lesson", "duration");
-
-  const totalMinutes = sections
-    .flatMap((sec) => sec.lesson)
-    .reduce((acc, lesson) => acc + (lesson?.duration || 0), 0);
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return `${hours}h ${minutes}m`;
 };
 
 // for instructors and admins (unke dashboard ke liye)
@@ -322,6 +309,7 @@ const fetchAllCourses = async (req, res) => {
       matchQuery.instructor = userId;
     }
 
+    // For admin/instructor dashboard, we need course content for duration calculation
     const [courses, total] = await Promise.all([
       Course.find(matchQuery)
         .populate("category", role === "admin" ? "name" : "")
@@ -329,6 +317,13 @@ const fetchAllCourses = async (req, res) => {
           "instructor",
           role === "admin" ? "firstName lastName email" : "",
         )
+        .populate({
+          path: "courseContent",
+          populate: {
+            path: "lesson",
+            select: "duration",
+          },
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -338,14 +333,18 @@ const fetchAllCourses = async (req, res) => {
     ]);
 
     if (role === "admin") {
-      const adminCourses = await Promise.all(
-        courses.map(async (course) => ({
-          ...course,
-          enrolledCount: course.enrolledStudents?.length || 0,
-          averageRating: course.averageRating || 0,
-          duration: await calculateCourseDuration(course.courseContent),
-        })),
-      );
+      const adminCourses = courses.map((course) => ({
+        ...course,
+        enrolledCount: course.enrolledStudents?.length || 0,
+        averageRating: course.averageRating || 0,
+        duration: (() => {
+          const lessons = course.courseContent.flatMap(
+            (sec) => sec.lesson || [],
+          );
+          const { hours, minutes } = calculateLessonStats(lessons);
+          return `${hours}h ${minutes}m`;
+        })(),
+      }));
 
       return res.status(200).json({
         success: true,
@@ -360,8 +359,11 @@ const fetchAllCourses = async (req, res) => {
     }
 
     if (role === "instructor") {
-      const instructorCourses = await Promise.all(
-        courses.map(async (course) => ({
+      const instructorCourses = courses.map((course) => {
+        const lessons = course.courseContent.flatMap((sec) => sec.lesson || []);
+        const { hours, minutes } = calculateLessonStats(lessons);
+
+        return {
           _id: course._id,
           title: course.title,
           status: course.status,
@@ -370,11 +372,11 @@ const fetchAllCourses = async (req, res) => {
           price: course.price,
           enrolledCount: course.enrolledStudents?.length || 0,
           averageRating: course.averageRating || 0,
-          duration: await calculateCourseDuration(course.courseContent),
+          duration: `${hours}h ${minutes}m`,
           feedback: course.feedback || "",
           updatedAt: course.updatedAt,
-        })),
-      );
+        };
+      });
 
       return res.status(200).json({
         success: true,
@@ -394,7 +396,7 @@ const fetchAllCourses = async (req, res) => {
       message: "Unauthorized role",
     });
   } catch (error) {
-    console.error("Get courses error:", error);
+    if (isDevelopment) console.error("Get courses error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch courses",
@@ -407,10 +409,10 @@ const getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!id) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
         success: false,
-        message: "course not found",
+        message: "Invalid or missing course ID",
       });
     }
 
@@ -427,16 +429,23 @@ const getCourseById = async (req, res) => {
       .populate("enrolledStudents")
       .populate("category", "name");
 
-    console.log(populatedCourse);
+    if (!populatedCourse) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      message: "Course details get succesfully",
+      message: "Course details fetched successfully",
       course: populatedCourse,
     });
   } catch (error) {
+    if (isDevelopment) console.error("Error in getCourseById:", error);
     return res.status(500).json({
       success: false,
-      message: "server error",
+      message: "Server error",
     });
   }
 };
@@ -468,7 +477,9 @@ function prepareUpdates(body, thumbnailUrl) {
         .map((i) => i.trim())
         .filter(Boolean);
     } else if (Array.isArray(body[f])) {
-      updates[f] = body[f].map((i) => i.trim()).filter(Boolean);
+      updates[f] = body[f]
+        .map((i) => (typeof i === "string" ? i.trim() : String(i)))
+        .filter(Boolean);
     }
   });
 
@@ -485,8 +496,10 @@ function prepareUpdates(body, thumbnailUrl) {
   if (body.category) updates.category = body.category;
 
   // Status
-  const valid = ["draft", "pending", "approved", "rejected"];
-  if (body.status && valid.includes(body.status)) updates.status = body.status;
+  const validStatuses = ["draft", "pending", "approved", "rejected"];
+  if (body.status && validStatuses.includes(body.status)) {
+    updates.status = body.status;
+  }
 
   return updates;
 }
@@ -539,13 +552,7 @@ const getCoursePreview = async (req, res) => {
     );
 
     // Total duration
-    const totalMinutes = allLessons.reduce(
-      (sum, lesson) => sum + (lesson?.duration || 0),
-      0,
-    );
-
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = Math.round(totalMinutes % 60);
+    const { hours, minutes } = calculateLessonStats(allLessons);
 
     // Ratings
     const ratings = course.ratingAndReviews || [];
@@ -594,11 +601,11 @@ const getCoursePreview = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in getCoursePreview:", error);
+    if (isDevelopment) console.error("Error in getCoursePreview:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch course preview",
-      error: error.message,
+      error: isDevelopment ? error.message : undefined,
     });
   }
 };
@@ -652,13 +659,7 @@ const getCourseDetails = async (req, res) => {
     );
 
     // Total duration
-    const totalMinutes = allLessons.reduce(
-      (sum, lesson) => sum + (lesson?.duration || 0),
-      0,
-    );
-
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = Math.round(totalMinutes % 60);
+    const { hours, minutes } = calculateLessonStats(allLessons);
 
     const formattedReviews = course.ratingAndReviews.map((r) => ({
       _id: r._id,
@@ -695,11 +696,11 @@ const getCourseDetails = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in getCourseDetails:", error);
+    if (isDevelopment) console.error("Error in getCourseDetails:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch course details",
-      error: error.message,
+      error: isDevelopment ? error.message : undefined,
     });
   }
 };
@@ -726,6 +727,18 @@ const getCourseContent = async (req, res) => {
       });
     }
 
+    // Verify user is enrolled in the course
+    const isEnrolled = course.enrolledStudents?.some(
+      (student) => student.toString() === userId,
+    );
+
+    if (!isEnrolled) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not enrolled in this course",
+      });
+    }
+
     const allLessons = course.courseContent.flatMap(
       (section) => section.lesson || [],
     );
@@ -734,7 +747,7 @@ const getCourseContent = async (req, res) => {
 
     let progress = await CourseProgress.findOne({
       userId,
-      id,
+      courseId: id,
     });
 
     const completedLessons = progress?.completedLessons || [];
@@ -768,7 +781,7 @@ const getCourseContent = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
+    if (isDevelopment) console.error("Error in getCourseContent:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to get course content",
@@ -846,7 +859,8 @@ const updateCourse = async (req, res) => {
       try {
         await deleteFromCloudinary(oldThumbnailUrl);
       } catch (err) {
-        console.error("Old thumbnail delete failed:", err.message);
+        if (isDevelopment)
+          console.error("Old thumbnail delete failed:", err.message);
       }
     }
 
@@ -862,7 +876,7 @@ const updateCourse = async (req, res) => {
       course: populatedCourse,
     });
   } catch (error) {
-    console.error("Error updating course:", error.message);
+    if (isDevelopment) console.error("Error updating course:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
