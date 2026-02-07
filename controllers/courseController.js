@@ -247,6 +247,7 @@ const getPublicCourses = async (req, res) => {
         price: course.price,
         discountPrice: course.discountPrice ?? null,
         averageRating: course.averageRating || 0,
+        enrolledStudents: course.enrolledStudents?.length || 0,
         category: course.category?.name || null,
         instructor: `${course.instructor?.firstName || ""} ${
           course.instructor?.lastName || ""
@@ -309,10 +310,10 @@ const fetchAllCourses = async (req, res) => {
       matchQuery.instructor = userId;
     }
 
-    // For admin/instructor dashboard, we need course content for duration calculation
+    //  We need course content for duration calculation
     const [courses, total] = await Promise.all([
       Course.find(matchQuery)
-        .populate("category", role === "admin" ? "name" : "")
+        .populate("category", "name")
         .populate(
           "instructor",
           role === "admin" ? "firstName lastName email" : "",
@@ -370,6 +371,7 @@ const fetchAllCourses = async (req, res) => {
           createdAt: course.createdAt,
           thumbnail: course.thumbnail,
           price: course.price,
+          category: course.category || null,
           enrolledCount: course.enrolledStudents?.length || 0,
           averageRating: course.averageRating || 0,
           duration: `${hours}h ${minutes}m`,

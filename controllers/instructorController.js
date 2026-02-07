@@ -1,5 +1,4 @@
 import Course from "../models/courseModal.js";
-import Section from "../models/sectionModal.js";
 import User from "../models/userModal.js";
 
 const getInstructorUsers = async (req, res) => {
@@ -78,7 +77,6 @@ const getInstructorUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Instructor get users error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch instructor students",
