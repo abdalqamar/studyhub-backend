@@ -9,27 +9,33 @@ import Profile from "../models/profileModal.js";
 import resetPasswordTemplate from "../template/resetPasswordTemplate.js";
 import passwordUpdateTemplate from "../template/passwordUpdateTemplate.js";
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "");
+
+const validatePassword = (password) =>
+  /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/.test(
+    password || "",
+  );
+
 const sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
+    if (!email || !validateEmail(email)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Valid email is required" });
     }
 
     const existUser = await User.findOne({ email });
     if (existUser) {
-      return res.status(401).json({
-        success: false,
-        message: "User already registered",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "User already registered" });
     }
 
     const lastOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
     const OTP_INTERVAL = 60 * 1000;
-
     if (lastOtp && Date.now() - lastOtp.createdAt.getTime() < OTP_INTERVAL) {
       const waitTime = Math.ceil(
         (OTP_INTERVAL - (Date.now() - lastOtp.createdAt.getTime())) / 1000,
@@ -41,21 +47,18 @@ const sendOtp = async (req, res) => {
     }
 
     const { otp } = await generateUniqueOTP(email);
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log(` OTP for ${email}: ${otp}`);
+    if (isDevelopment) {
+      console.log(`OTP for ${email}: ${otp}`);
     }
 
-    res.status(200).json({
-      success: true,
-      message: "OTP sent to your email",
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "OTP sent to your email" });
   } catch (error) {
-    console.error("Send OTP Error", error);
-    res.status(500).json({
-      success: false,
-      message: "OTP not generated",
-    });
+    if (isDevelopment) console.error("sendOtp error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "OTP not generated" });
   }
 };
 
@@ -64,44 +67,43 @@ const register = async (req, res) => {
     const { firstName, lastName, email, password, confirmPassword, otp } =
       req.body;
 
-    // data from req body
-    if (
-      [firstName, email, password, confirmPassword, otp].some(
-        (field) => field?.trim() === "",
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
+    if (!firstName || !email || !password || !confirmPassword || !otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required" });
     }
-
-    // check user exists
-    const existUser = await User.findOne({ email });
-    if (existUser) {
-      return res.status(401).json({
-        success: false,
-        message: "User already exist",
-      });
+    if (!validateEmail(email)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid email format" });
     }
-
-    // match passwords
-
     if (password !== confirmPassword) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
-        message: "Passwrd and confirom password do not match",
+        message: "Password and confirm password do not match",
+      });
+    }
+    if (!validatePassword(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 6 chars, include uppercase, number and special char",
       });
     }
 
-    // check valid otp
-    const validOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
+    const existUser = await User.findOne({ email: email.trim().toLowerCase() });
+    if (existUser)
+      return res
+        .status(401)
+        .json({ success: false, message: "User already exists" });
 
-    if (validOtp.otp !== req.body.otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid OTP",
-      });
+    const validOtp = await OTP.findOne({
+      email: email.trim().toLowerCase(),
+    }).sort({ createdAt: -1 });
+    if (!validOtp || validOtp.otp !== otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
     }
 
     const userProfile = await Profile.create({
@@ -109,100 +111,108 @@ const register = async (req, res) => {
       dateOfBirth: null,
       contactNumber: null,
       about: null,
-      profileImage: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(
-        `${firstName} ${lastName}`,
-      )}`,
+      profileImage: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(`${firstName} ${lastName || ""}`)}`,
     });
 
     const user = await User.create({
-      firstName,
-      lastName: lastName || null,
-      email,
+      firstName: firstName.trim(),
+      lastName: lastName?.trim() || null,
+      email: email.trim().toLowerCase(),
       password,
       additionalInformation: userProfile._id,
     });
 
+    await OTP.deleteOne({ _id: validOtp._id });
+
     return res.status(200).json({
       success: true,
-      message: "registred successful",
-      user,
+      message: "Registration successful",
+      user: { id: user._id, email: user.email, firstName: user.firstName },
     });
   } catch (error) {
-    console.error("register error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    if (isDevelopment) console.error("register error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and Password are required",
-      });
-    }
+    if (!email || !password)
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and password are required" });
+    if (!validateEmail(email))
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid email format" });
 
-    const user = await User.findOne({ email }).populate(
-      "additionalInformation",
-      "profileImage",
-    );
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
-    if (user.status === "suspended") {
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    }).populate("additionalInformation", "profileImage");
+    if (!user)
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    if (user.status === "suspended")
       return res.status(403).json({
         success: false,
         message: "Your account has been suspended. Contact support.",
       });
-    }
 
-    // Password check
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
+    if (!isMatch)
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
 
-    // Generate access and refresh tokens
     const { accessToken, refreshToken } = generateTokens({
       id: user._id,
       email: user.email,
       role: user.role,
     });
 
-    user.refreshTokens = user.refreshTokens.filter(
-      (token) =>
-        token.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000 > Date.now(),
-    );
-
-    // Save refresh token in DB
-    user.refreshTokens.push({
-      token: refreshToken,
-      createdAt: new Date(),
-    });
-
-    if (user.refreshTokens.length > 3) {
-      user.refreshTokens = user.refreshTokens.slice(-3);
-    }
-
-    user.lastActive = new Date();
-    user.status = "active";
-
-    await user.save();
+    // update
+    await User.updateOne({ _id: user._id }, [
+      {
+        $set: {
+          refreshTokens: {
+            $let: {
+              vars: {
+                recent: {
+                  $filter: {
+                    input: "$refreshTokens",
+                    as: "rt",
+                    cond: {
+                      $gt: [
+                        "$$rt.createdAt",
+                        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                      ],
+                    },
+                  },
+                },
+              },
+              in: {
+                $slice: [
+                  {
+                    $concatArrays: [
+                      "$$recent",
+                      [{ token: refreshToken, createdAt: new Date() }],
+                    ],
+                  },
+                  -3,
+                ],
+              },
+            },
+          },
+          lastActive: new Date(),
+        },
+      },
+    ]);
 
     const isProd = process.env.NODE_ENV === "production";
-
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProd,
@@ -214,75 +224,66 @@ const login = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Login successfully",
-      accessToken: accessToken,
+      message: "Login successful",
+      accessToken,
       user: {
-        id: user.id,
+        id: user._id,
         email: user.email,
         role: user.role,
-        lastActive: user.lastActive,
+        firstName: user.firstName,
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    if (isDevelopment) console.error("login error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
 const logout = async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
-
-    if (!refreshToken) {
-      res.clearCookie("refreshToken", { httpOnly: true });
-      return res
-        .status(200)
-        .json({ success: true, message: "Logged out successfully" });
+    if (refreshToken) {
+      await User.updateOne(
+        { "refreshTokens.token": refreshToken },
+        {
+          $pull: { refreshTokens: { token: refreshToken } },
+        },
+      );
     }
 
-    await User.updateOne(
-      { "refreshTokens.token": refreshToken },
-      {
-        $pull: { refreshTokens: { token: refreshToken } },
-        $set: { status: "inactive" },
-      },
-    );
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    });
 
-    res.clearCookie("refreshToken", { httpOnly: true });
-    return res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    if (isDevelopment) console.error("logout error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
+    if (!email || !validateEmail(email))
+      return res
+        .status(400)
+        .json({ success: false, message: "Valid email is required" });
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    user.passwordResetData = undefined;
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto
       .createHash("sha256")
@@ -293,15 +294,13 @@ const forgotPassword = async (req, res) => {
       token: hashedToken,
       expires: new Date(Date.now() + 5 * 60 * 1000),
     };
-
     await user.save({ validateBeforeSave: false });
 
     const url = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-
     await sendEmail(
-      email,
+      user.email,
       "Reset Your Password - StudyHub (Valid for 5 minutes)",
-      resetPasswordTemplate(email, user.firstName, url),
+      resetPasswordTemplate(user.email, user.firstName, url),
     );
 
     return res.status(200).json({
@@ -309,7 +308,7 @@ const forgotPassword = async (req, res) => {
       message: "Password reset link sent to email successfully",
     });
   } catch (error) {
-    console.error("Forgot Password error:", error);
+    if (isDevelopment) console.error("forgotPassword error:", error);
     return res.status(500).json({
       success: false,
       message: "Error while sending reset link to email",
@@ -321,39 +320,35 @@ const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { newPassword, confirmNewPassword } = req.body;
-
-    if (!newPassword || !confirmNewPassword || !token) {
+    if (!token || !newPassword || !confirmNewPassword)
       return res
         .status(400)
-        .json({ success: false, message: "All fields required" });
-    }
-
-    if (newPassword !== confirmNewPassword) {
+        .json({ success: false, message: "All fields are required" });
+    if (newPassword !== confirmNewPassword)
       return res
         .status(400)
         .json({ success: false, message: "Passwords do not match" });
-    }
+    if (!validatePassword(newPassword))
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 chars, include uppercase, number and special char",
+      });
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    // Find user with valid reset token
     const user = await User.findOne({
       "passwordResetData.token": hashedToken,
       "passwordResetData.expires": { $gt: new Date() },
     });
-
-    if (!user) {
+    if (!user)
       return res.status(400).json({
         success: false,
         message:
-          "Invalid or expired reset token. Please request a new password reset",
+          "Invalid or expired reset token. Please request a new password reset.",
       });
-    }
-    user.password = newPassword;
-    // Clear reset token data
-    user.passwordResetData = undefined;
 
-    // Clear all refresh tokens and force re-login on all devices
+    user.password = newPassword;
+    user.passwordResetData = undefined;
     user.refreshTokens = [];
     await user.save();
 
@@ -362,16 +357,15 @@ const resetPassword = async (req, res) => {
       "Password Updated Successfully - StudyHub",
       passwordUpdateTemplate(user.email, user.firstName),
     );
-
     return res.status(200).json({
       success: true,
-      message: "Password reset successful.",
+      message: "Password reset successful. Please login again.",
     });
   } catch (error) {
-    console.error(error.message);
+    if (isDevelopment) console.error("resetPassword error:", error);
     return res
-      .status(400)
-      .json({ success: false, message: "Invalid or expired token" });
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -379,43 +373,58 @@ const changePassword = async (req, res) => {
   try {
     const { id } = req.user;
     const { oldPassword, newPassword, confirmPassword } = req.body;
-    const user = await User.findById(id);
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    if (!oldPassword || !newPassword || !confirmPassword)
       return res
         .status(400)
         .json({ success: false, message: "All fields are required" });
-    }
-
-    if (newPassword !== confirmPassword) {
+    if (newPassword !== confirmPassword)
       return res
         .status(400)
         .json({ success: false, message: "Passwords do not match" });
-    }
+    if (!validatePassword(newPassword))
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 chars, include uppercase, number and special char",
+      });
+
+    const user = await User.findById(id);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
     const isMatch = await user.comparePassword(oldPassword);
-    if (!isMatch) {
+    if (!isMatch)
       return res
         .status(401)
         .json({ success: false, message: "Old password is incorrect" });
-    }
 
     user.password = newPassword;
     user.refreshTokens = [];
     await user.save();
 
-    const mailResponse = await sendEmail(
+    await sendEmail(
       user.email,
-      "Password update email",
+      "Password Updated - StudyHub",
       passwordUpdateTemplate(user.email, user.firstName),
     );
 
-    return res.status(200).json({ message: "Password updated successfully" });
-  } catch (error) {
-    console.log("Error while updating password");
-    return res.status(500).json({
-      success: false,
-      message: error.message,
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
     });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully. Please login again.",
+    });
+  } catch (error) {
+    if (isDevelopment) console.error("changePassword error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -431,6 +440,10 @@ const refreshToken = async (req, res) => {
     try {
       decoded = jwt.verify(refreshTokenCookie, process.env.JWT_REFRESH_SECRET);
     } catch {
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+      });
       return res
         .status(401)
         .json({ success: false, message: "Invalid or expired refresh token" });
@@ -440,44 +453,56 @@ const refreshToken = async (req, res) => {
     if (
       !user ||
       !user.refreshTokens.some((t) => t.token === refreshTokenCookie)
-    )
+    ) {
       return res
         .status(401)
         .json({ success: false, message: "Invalid refresh token" });
-
-    if (user.status === "suspended") {
-      return res.status(403).json({
-        success: false,
-        message: "Your account has been suspended",
-      });
     }
+    if (user.status === "suspended")
+      return res
+        .status(403)
+        .json({ success: false, message: "Your account has been suspended" });
 
-    const newToken = generateTokens({
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens({
       id: user._id,
       email: user.email,
       role: user.role,
     });
 
-    // rotate users refresh tokens in DB
-    await User.updateOne(
-      { _id: user._id },
-      { $pull: { refreshTokens: { token: refreshTokenCookie } } },
-    );
-
-    await User.updateOne(
-      { _id: user._id },
+    // remove old token, append new, keep last 3
+    await User.updateOne({ _id: user._id }, [
       {
-        $push: {
+        $set: {
           refreshTokens: {
-            $each: [{ token: newToken.refreshToken, createdAt: new Date() }],
-            $slice: -3,
+            $let: {
+              vars: {
+                filtered: {
+                  $filter: {
+                    input: "$refreshTokens",
+                    as: "rt",
+                    cond: { $ne: ["$$rt.token", refreshTokenCookie] },
+                  },
+                },
+              },
+              in: {
+                $slice: [
+                  {
+                    $concatArrays: [
+                      "$$filtered",
+                      [{ token: newRefreshToken, createdAt: new Date() }],
+                    ],
+                  },
+                  -3,
+                ],
+              },
+            },
           },
         },
       },
-    );
+    ]);
 
     const isProd = process.env.NODE_ENV === "production";
-    res.cookie("refreshToken", newToken.refreshToken, {
+    res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? "strict" : "lax",
@@ -489,11 +514,16 @@ const refreshToken = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Token refreshed successfully",
-      accessToken: newToken.accessToken,
-      user: { id: user.id, email: user.email, role: user.role },
+      accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+      },
     });
   } catch (error) {
-    console.error("Refresh token error:", error);
+    if (isDevelopment) console.error("refreshToken error:", error);
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
