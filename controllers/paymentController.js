@@ -7,26 +7,45 @@ import enrollmentEmailTemplate from "../template/enrollmentEmailTemplate.js";
 import paymentFailedEmailTemplate from "../template/paymentFailedEmailTemplate.js";
 import razorpay from "../config/razorpay.js";
 
+// Environment & Constants
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+const PAYMENT_STATUS = {
+  SUCCESS: "success",
+  FAILED: "failed",
+};
+
+// Validate MongoDB ObjectId format
+const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id?.toString() || "");
+
 // create Razorpay order
 const createOrder = async (req, res) => {
   try {
     const { courseIds } = req.body;
     const userId = req.user.id;
 
-    if (!courseIds || courseIds.length === 0) {
+    if (!courseIds || !Array.isArray(courseIds) || courseIds.length === 0) {
       return res
         .status(400)
         .json({ message: "Please select at least one course" });
     }
 
+    // Validate courseIds format
+    if (!courseIds.every(isValidObjectId)) {
+      return res.status(400).json({ message: "Invalid course IDs format" });
+    }
+
     const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
 
     let totalAmount = 0;
 
     const courses = await Course.find({ _id: { $in: courseIds } });
 
     if (courses.length !== courseIds.length) {
-      return res.status(404).json({ message: "Course not found" });
+      return res.status(404).json({ message: "One or more courses not found" });
     }
 
     for (const course of courses) {
@@ -53,7 +72,7 @@ const createOrder = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.error("Order error:", error);
+    if (isDevelopment) console.error("Order error:", error);
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -154,10 +173,12 @@ const sendEnrollmentEmail = (user, payment, titles) =>
         html,
       );
     } catch (e) {
-      console.error("[Webhook] Enrollment email failed", {
-        order_id: payment.order_id,
-        error: e.message,
-      });
+      if (isDevelopment) {
+        console.error("[Webhook] Enrollment email failed", {
+          order_id: payment.order_id,
+          error: e.message,
+        });
+      }
     }
   });
 
@@ -176,10 +197,12 @@ const sendFailureEmail = (user, payment) =>
       );
       await sendEmail(user.email, "Payment Failed - StudyHub", html);
     } catch (e) {
-      console.error("[Webhook] Failure email failed", {
-        order_id: payment.order_id,
-        error: e.message,
-      });
+      if (isDevelopment) {
+        console.error("[Webhook] Failure email failed", {
+          order_id: payment.order_id,
+          error: e.message,
+        });
+      }
     }
   });
 
@@ -188,14 +211,15 @@ const razorpayWebhook = async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
   if (!secret) {
-    console.error("[Webhook] Missing RAZORPAY_WEBHOOK_SECRET");
+    if (isDevelopment)
+      console.error("[Webhook] Missing RAZORPAY_WEBHOOK_SECRET");
     return res
       .status(500)
       .json({ success: false, message: "Server configuration error" });
   }
 
   if (!verifySignature(req.body, signature, secret)) {
-    console.warn("[Webhook] Signature mismatch");
+    if (isDevelopment) console.warn("[Webhook] Signature mismatch");
     return res
       .status(400)
       .json({ success: false, message: "Invalid signature" });
@@ -205,44 +229,65 @@ const razorpayWebhook = async (req, res) => {
   try {
     ({ event, payload } = JSON.parse(req.body.toString("utf8")));
   } catch {
-    console.warn("[Webhook] Bad JSON payload");
+    if (isDevelopment) console.warn("[Webhook] Bad JSON payload");
     return res
       .status(400)
       .json({ success: false, message: "Malformed payload" });
   }
 
-  console.log("[Webhook] Event received", {
-    event,
-    order_id: payload?.payment?.entity?.order_id,
-  });
+  if (isDevelopment) {
+    console.log("[Webhook] Event received", {
+      event,
+      order_id: payload?.payment?.entity?.order_id,
+    });
+  }
 
   // Payment success
   if (event === "payment.captured") {
     const payment = payload.payment.entity;
 
     try {
+      // Validate payment entity structure
+      if (!payment || !payment.id) {
+        if (isDevelopment) console.warn("[Webhook] Invalid payment entity");
+        return res.status(200).json({ success: true });
+      }
+
       // check duplicate
       const already = await Payment.findOne({
         transactionId: payment.id,
       });
 
       if (already) {
-        console.log("[Webhook] Duplicate payment ignored", payment.id);
+        if (isDevelopment)
+          console.log("[Webhook] Duplicate payment ignored", payment.id);
         return res.status(200).json({ success: true });
       }
 
       // payment record creation
       const notes = parseNotes(payment);
       if (!notes) {
-        console.warn("[Webhook] Invalid notes", payment.id);
+        if (isDevelopment) console.warn("[Webhook] Invalid notes", payment.id);
         return res.status(200).json({ success: true });
       }
 
       const { userId, courseIds } = notes;
 
+      // Validate userId
+      if (!isValidObjectId(userId)) {
+        if (isDevelopment)
+          console.warn("[Webhook] Invalid userId format", userId);
+        return res.status(200).json({ success: true });
+      }
+
       const courses = await Course.find({
         _id: { $in: courseIds },
       }).select("price instructor");
+
+      if (courses.length !== courseIds.length) {
+        if (isDevelopment) console.warn("[Webhook] Course mismatch", courseIds);
+        return res.status(200).json({ success: true });
+      }
 
       for (const course of courses) {
         await Payment.create({
@@ -251,7 +296,7 @@ const razorpayWebhook = async (req, res) => {
           instructor: course.instructor,
           amount: course.price,
           currency: payment.currency,
-          status: "success",
+          status: PAYMENT_STATUS.SUCCESS,
           paymentMethod: "razorpay",
           transactionId: payment.id,
           paymentGatewayOrderId: payment.order_id,
@@ -268,7 +313,8 @@ const razorpayWebhook = async (req, res) => {
 
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error("[Webhook] payment.captured error", err.message);
+      if (isDevelopment)
+        console.error("[Webhook] payment.captured error", err.message);
       return res.status(500).json({ success: false });
     }
   }
@@ -278,10 +324,22 @@ const razorpayWebhook = async (req, res) => {
     const payment = payload.payment.entity;
 
     try {
+      if (!payment || !payment.id) {
+        if (isDevelopment) console.warn("[Webhook] Invalid payment entity");
+        return res.status(200).json({ success: true });
+      }
+
       const notes = parseNotes(payment);
 
       if (notes) {
         const { userId, courseIds } = notes;
+
+        // Validate userId
+        if (!isValidObjectId(userId)) {
+          if (isDevelopment)
+            console.warn("[Webhook] Invalid userId format", userId);
+          return res.status(200).json({ success: true });
+        }
 
         // record failed payment
         await Payment.create({
@@ -289,7 +347,7 @@ const razorpayWebhook = async (req, res) => {
           course: courseIds[0],
           amount: payment.amount / 100,
           currency: payment.currency,
-          status: "failed",
+          status: PAYMENT_STATUS.FAILED,
           paymentMethod: "razorpay",
           transactionId: payment.id,
           paymentGatewayOrderId: payment.order_id,
@@ -305,13 +363,16 @@ const razorpayWebhook = async (req, res) => {
 
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error("[Webhook] payment.failed error", err.message);
+      if (isDevelopment)
+        console.error("[Webhook] payment.failed error", err.message);
       return res.status(200).json({ success: true });
     }
   }
 
   //unhandled
-  console.log("[Webhook] Unhandled event", { event });
+  if (isDevelopment) {
+    console.log("[Webhook] Unhandled event", { event });
+  }
   return res.status(200).json({ success: true });
 };
 
