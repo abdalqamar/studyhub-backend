@@ -4,7 +4,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import CourseProgress from "../models/courseProgressModal.js";
 import Course from "../models/courseModal.js";
 
-const updateProfile = async (req, res) => {
+const updateProfile = async (req, res, next) => {
   try {
     const id = req.user.id;
 
@@ -63,14 +63,11 @@ const updateProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating profile:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    return next(error);
   }
 };
 
-const updateProfileImage = async (req, res) => {
+const updateProfileImage = async (req, res, next) => {
   try {
     const { id } = req.user;
 
@@ -105,15 +102,12 @@ const updateProfileImage = async (req, res) => {
       updatedProfile,
     });
   } catch (error) {
-    console.error("Error updating profileImage:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    return next(error);
   }
 };
 
 // Get user details for there profile
-const getUserDetails = async (req, res) => {
+const getUserDetails = async (req, res, next) => {
   try {
     const { id } = req.user;
     const user = await User.findById(id)
@@ -143,14 +137,12 @@ const getUserDetails = async (req, res) => {
       user: userData,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    return next(error);
   }
 };
 
 // For getting enrolled courses of user
-const getEnrolledCourses = async (req, res) => {
+const getEnrolledCourses = async (req, res, next) => {
   try {
     const userId = req.user?.id;
 
@@ -240,11 +232,7 @@ const getEnrolledCourses = async (req, res) => {
       courses: coursesWithProgress,
     });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch enrolled courses",
-    });
+    return next(err);
   }
 };
 

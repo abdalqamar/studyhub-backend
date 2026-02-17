@@ -19,7 +19,7 @@ const PAYMENT_STATUS = {
 const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id?.toString() || "");
 
 // create Razorpay order
-const createOrder = async (req, res) => {
+const createOrder = async (req, res, next) => {
   try {
     const { courseIds } = req.body;
     const userId = req.user.id;
@@ -72,8 +72,7 @@ const createOrder = async (req, res) => {
       order,
     });
   } catch (error) {
-    if (isDevelopment) console.error("Order error:", error);
-    return res.status(500).json({ message: "Something went wrong" });
+    return next(error);
   }
 };
 
@@ -206,7 +205,7 @@ const sendFailureEmail = (user, payment) =>
     }
   });
 
-const razorpayWebhook = async (req, res) => {
+const razorpayWebhook = async (req, res, next) => {
   const signature = req.headers["x-razorpay-signature"];
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 

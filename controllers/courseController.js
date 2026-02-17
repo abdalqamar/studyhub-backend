@@ -21,7 +21,7 @@ const calculateLessonStats = (lessons = []) => {
   return { totalMinutes, hours, minutes };
 };
 
-const createCourse = async (req, res) => {
+const createCourse = async (req, res, next) => {
   try {
     if (req.user.role !== "instructor" && req.user.role !== "admin") {
       return res.status(403).json({
@@ -130,16 +130,11 @@ const createCourse = async (req, res) => {
       course: newCourse,
     });
   } catch (error) {
-    if (isDevelopment) console.error("Course creation error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Course creation failed",
-      error: isDevelopment ? error.message : undefined,
-    });
+    return next(error);
   }
 };
 
-const deleteCourse = async (req, res) => {
+const deleteCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -192,13 +187,12 @@ const deleteCourse = async (req, res) => {
       data: {},
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error deleting course:", error.message);
-    return res.status(500).json({ success: false, message: error.message });
+    return next(error);
   }
 };
 
 // for public users, (jiska status approved ho)
-const getPublicCourses = async (req, res) => {
+const getPublicCourses = async (req, res, next) => {
   try {
     const { search, category, page = 1, limit = 12 } = req.query;
 
@@ -269,16 +263,12 @@ const getPublicCourses = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error fetching public courses:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch courses",
-    });
+    return next(error);
   }
 };
 
 // for instructors and admins (unke dashboard ke liye)
-const fetchAllCourses = async (req, res) => {
+const fetchAllCourses = async (req, res, next) => {
   try {
     const { role, id: userId } = req.user;
 
@@ -398,16 +388,12 @@ const fetchAllCourses = async (req, res) => {
       message: "Unauthorized role",
     });
   } catch (error) {
-    if (isDevelopment) console.error("Get courses error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch courses",
-    });
+    return next(error);
   }
 };
 
 // single course by id
-const getCourseById = async (req, res) => {
+const getCourseById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -444,11 +430,7 @@ const getCourseById = async (req, res) => {
       course: populatedCourse,
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error in getCourseById:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return next(error);
   }
 };
 
@@ -507,7 +489,7 @@ function prepareUpdates(body, thumbnailUrl) {
 }
 
 // for course preview (admin and instructors)
-const getCoursePreview = async (req, res) => {
+const getCoursePreview = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -603,17 +585,12 @@ const getCoursePreview = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error in getCoursePreview:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch course preview",
-      error: isDevelopment ? error.message : undefined,
-    });
+    return next(error);
   }
 };
 
 // course details for public users
-const getCourseDetails = async (req, res) => {
+const getCourseDetails = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -698,16 +675,11 @@ const getCourseDetails = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error in getCourseDetails:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch course details",
-      error: isDevelopment ? error.message : undefined,
-    });
+    return next(error);
   }
 };
 
-const getCourseContent = async (req, res) => {
+const getCourseContent = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -783,15 +755,11 @@ const getCourseContent = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error in getCourseContent:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get course content",
-    });
+    return next(error);
   }
 };
 
-const updateCourse = async (req, res) => {
+const updateCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -878,8 +846,7 @@ const updateCourse = async (req, res) => {
       course: populatedCourse,
     });
   } catch (error) {
-    if (isDevelopment) console.error("Error updating course:", error.message);
-    return res.status(500).json({ success: false, message: error.message });
+    return next(error);
   }
 };
 export {

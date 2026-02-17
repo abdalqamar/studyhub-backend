@@ -4,7 +4,7 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
-const createCategory = async (req, res) => {
+const createCategory = async (req, res, next) => {
   try {
     const { name, description } = req.body;
     const localFile = req.file ? req.file.path : null;
@@ -40,15 +40,11 @@ const createCategory = async (req, res) => {
       updatedCategory,
     });
   } catch (error) {
-    console.log("Error:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create category",
-    });
+    return next(error);
   }
 };
 
-const deleteCategory = async (req, res) => {
+const deleteCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -66,15 +62,11 @@ const deleteCategory = async (req, res) => {
       message: "Category deleted successfully",
     });
   } catch (error) {
-    console.error("Delete Category Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting category",
-    });
+    return next(error);
   }
 };
 
-const updateCategory = async (req, res) => {
+const updateCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -144,16 +136,11 @@ const updateCategory = async (req, res) => {
       updatedCategory,
     });
   } catch (error) {
-    console.error("Error updating category:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const getAllCategories = async (req, res) => {
+const getAllCategories = async (req, res, next) => {
   try {
     const categoriesWithStats = await Category.aggregate([
       {
@@ -229,16 +216,11 @@ const getAllCategories = async (req, res) => {
       categories: categoriesWithStats,
     });
   } catch (error) {
-    console.error("Error in getAllCategories:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server Error",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const getCategoryById = async (req, res) => {
+const getCategoryById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -257,11 +239,7 @@ const getCategoryById = async (req, res) => {
       message: "Category fetched successfully",
     });
   } catch (error) {
-    console.error("Error fetching category:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching category",
-    });
+    return next(error);
   }
 };
 

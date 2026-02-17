@@ -2,7 +2,7 @@ import Section from "../models/sectionModal.js";
 import Course from "../models/courseModal.js";
 import Lesson from "../models/lessonModal.js";
 
-const createSection = async (req, res) => {
+const createSection = async (req, res, next) => {
   try {
     const { sectionName } = req.body;
     const { courseId } = req.params;
@@ -44,25 +44,19 @@ const createSection = async (req, res) => {
       $push: { courseContent: section._id },
     });
 
-    // Sirf new section return karo
+    // Only new section return
     return res.status(201).json({
       success: true,
       message: "Section created successfully",
       newSection: section,
     });
   } catch (error) {
-    console.error("Error creating section:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create section",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const updateSection = async (req, res) => {
+const updateSection = async (req, res, next) => {
   try {
-    console.log(req.params, req.body);
     const { sectionName } = req.body;
     const { sectionId, courseId } = req.params;
 
@@ -102,16 +96,11 @@ const updateSection = async (req, res) => {
       updatedSection,
     });
   } catch (error) {
-    console.error("Error updating section:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong while updating section",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const deleteSection = async (req, res) => {
+const deleteSection = async (req, res, next) => {
   try {
     const { courseId, sectionId } = req.params;
 
@@ -141,7 +130,7 @@ const deleteSection = async (req, res) => {
       $pull: { courseContent: sectionId },
     });
 
-    // Delete the section - CORRECT SYNTAX
+    // Delete the section
     await Section.findByIdAndDelete(sectionId);
 
     return res.status(200).json({
@@ -150,12 +139,7 @@ const deleteSection = async (req, res) => {
       sectionId,
     });
   } catch (error) {
-    console.error("Error deleting section:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong while deleting section",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 

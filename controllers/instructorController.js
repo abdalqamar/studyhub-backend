@@ -1,7 +1,7 @@
 import Course from "../models/courseModal.js";
 import User from "../models/userModal.js";
 
-const getInstructorUsers = async (req, res) => {
+const getInstructorUsers = async (req, res, next) => {
   try {
     const { id } = req.user;
     const { search, status, page = 1, limit = 12 } = req.query;
@@ -77,10 +77,7 @@ const getInstructorUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch instructor students",
-    });
+    return next(error);
   }
 };
 

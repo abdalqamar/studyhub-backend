@@ -3,7 +3,7 @@ import User from "../models/userModal.js";
 import Profile from "../models/profileModal.js";
 import Payment from "../models/payment.modal.js";
 
-const approveCourse = async (req, res) => {
+const approveCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -24,14 +24,11 @@ const approveCourse = async (req, res) => {
       course,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error approving course",
-    });
+    return next(error);
   }
 };
 
-const rejectCourse = async (req, res) => {
+const rejectCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { feedback } = req.body;
@@ -53,14 +50,11 @@ const rejectCourse = async (req, res) => {
       course,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error rejecting course",
-    });
+    return next(error);
   }
 };
 
-const getAdminUsers = async (req, res) => {
+const getAdminUsers = async (req, res, next) => {
   try {
     const { role, search, status, page = 1, limit = 12 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -198,15 +192,11 @@ const getAdminUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Admin get users error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch users",
-    });
+    return next(error);
   }
 };
 
-const updateUserStatus = async (req, res) => {
+const updateUserStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -221,14 +211,11 @@ const updateUserStatus = async (req, res) => {
       user,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error updating user status",
-    });
+    return next(error);
   }
 };
 
-const deleteUserByAdmin = async (req, res) => {
+const deleteUserByAdmin = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -279,15 +266,11 @@ const deleteUserByAdmin = async (req, res) => {
       message: "User deleted successfully",
     });
   } catch (error) {
-    console.error("Delete user error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete user",
-    });
+    return next(error);
   }
 };
 
-const getAdminDashboard = async (req, res) => {
+const getAdminDashboard = async (req, res, next) => {
   try {
     const [
       totalRevenue,
@@ -447,15 +430,11 @@ const getAdminDashboard = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[AdminDashboard] error", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load admin dashboard",
-    });
+    return next(error);
   }
 };
 
-const getAdminTransactions = async (req, res) => {
+const getAdminTransactions = async (req, res, next) => {
   try {
     const {
       status = "all",
@@ -540,11 +519,7 @@ const getAdminTransactions = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("AdminTransactions", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load transactions",
-    });
+    return next(error);
   }
 };
 

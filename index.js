@@ -1,3 +1,5 @@
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -16,6 +18,25 @@ import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 
+// Security headers
+app.use(helmet());
+app.use(cors(corsConfig));
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  handler: (req, res) => {
+    return res.status(429).set("Content-Type", "application/problem+json").json({
+      type: "https://httpstatuses.com/429",
+      title: "Too Many Requests",
+      status: 429,
+      detail: "Too many requests, please try again after 15 minutes",
+      instance: req.originalUrl,
+    });
+  },
+});
+
 // Webhook
 app.post(
   "/api/v1/payment/webhook",
@@ -23,14 +44,13 @@ app.post(
   razorpayWebhook,
 );
 
+app.use("/api/v1", apiLimiter);
+
 // Middleware )
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 app.use(cookieParser());
-
-// CORS setup
-app.use(cors(corsConfig));
 
 // Routes
 app.use("/api/v1/auth", authRoutes);
@@ -45,15 +65,25 @@ app.get("/", (_, res) => {
   res.send("Hello from StudyHub");
 });
 
-// Global error handler
-app.use(errorHandler);
-
 // Simple health endpoint to check DB connectivity
 app.get("/health", async (_, res) => {
   const state = mongoose.connection.readyState;
   const healthy = state === 1;
   res.status(healthy ? 200 : 503).json({ healthy, dbState: state });
 });
+
+// Not found handler (RFC7807-ready)
+app.use((req, res, next) => {
+  next({
+    status: 404,
+    title: "Not Found",
+    detail: `Route ${req.originalUrl} not found`,
+    type: "https://httpstatuses.com/404",
+  });
+});
+
+// Global error handler
+app.use(errorHandler);
 
 // Start server after DB connection
 const PORT = process.env.PORT || 5000;

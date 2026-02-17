@@ -3,7 +3,7 @@ import Course from "../models/courseModal.js";
 import RatingAndReviews from "../models/ratingAndRewiews.js";
 
 // For create review
-const createReview = async (req, res) => {
+const createReview = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const courseId = req.params.id;
@@ -86,16 +86,12 @@ const createReview = async (req, res) => {
       data: newReview,
     });
   } catch (error) {
-    console.error("Error creating rating:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong",
-    });
+    return next(error);
   }
 };
 
 // Delete review controller
-const deleteReview = async (req, res) => {
+const deleteReview = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -146,15 +142,11 @@ const deleteReview = async (req, res) => {
       message: "Review deleted & average rating updated",
     });
   } catch (error) {
-    console.error("Delete review error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong",
-    });
+    return next(error);
   }
 };
 
 // update review controller
-const updateReview = async (req, res) => {};
+const updateReview = async (req, res, next) => {};
 
 export { createReview, updateReview, deleteReview };

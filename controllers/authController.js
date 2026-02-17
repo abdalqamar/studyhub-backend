@@ -18,7 +18,7 @@ const validatePassword = (password) =>
     password || "",
   );
 
-const sendOtp = async (req, res) => {
+const sendOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email || !validateEmail(email)) {
@@ -55,14 +55,11 @@ const sendOtp = async (req, res) => {
       .status(200)
       .json({ success: true, message: "OTP sent to your email" });
   } catch (error) {
-    if (isDevelopment) console.error("sendOtp error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "OTP not generated" });
+    return next(error);
   }
 };
 
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, confirmPassword, otp } =
       req.body;
@@ -130,14 +127,11 @@ const register = async (req, res) => {
       user: { id: user._id, email: user.email, firstName: user.firstName },
     });
   } catch (error) {
-    if (isDevelopment) console.error("register error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password)
@@ -234,14 +228,11 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("login error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 
-const logout = async (req, res) => {
+const logout = async (req, res, next) => {
   try {
     const { refreshToken } = req.cookies;
     if (refreshToken) {
@@ -263,14 +254,11 @@ const logout = async (req, res) => {
       .status(200)
       .json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    if (isDevelopment) console.error("logout error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 
-const forgotPassword = async (req, res) => {
+const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email || !validateEmail(email))
@@ -308,15 +296,11 @@ const forgotPassword = async (req, res) => {
       message: "Password reset link sent to email successfully",
     });
   } catch (error) {
-    if (isDevelopment) console.error("forgotPassword error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error while sending reset link to email",
-    });
+    return next(error);
   }
 };
 
-const resetPassword = async (req, res) => {
+const resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
     const { newPassword, confirmNewPassword } = req.body;
@@ -362,14 +346,11 @@ const resetPassword = async (req, res) => {
       message: "Password reset successful. Please login again.",
     });
   } catch (error) {
-    if (isDevelopment) console.error("resetPassword error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 
-const changePassword = async (req, res) => {
+const changePassword = async (req, res, next) => {
   try {
     const { id } = req.user;
     const { oldPassword, newPassword, confirmPassword } = req.body;
@@ -421,14 +402,11 @@ const changePassword = async (req, res) => {
       message: "Password updated successfully. Please login again.",
     });
   } catch (error) {
-    if (isDevelopment) console.error("changePassword error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 
-const refreshToken = async (req, res) => {
+const refreshToken = async (req, res, next) => {
   try {
     const { refreshToken: refreshTokenCookie } = req.cookies;
     if (!refreshTokenCookie)
@@ -523,10 +501,7 @@ const refreshToken = async (req, res) => {
       },
     });
   } catch (error) {
-    if (isDevelopment) console.error("refreshToken error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    return next(error);
   }
 };
 

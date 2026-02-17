@@ -44,6 +44,7 @@ const updateLastActive = async (req, res, next) => {
 
     const FIVE_MIN = 5 * 60 * 1000;
     const user = await User.findById(req.user.id).select("lastActive");
+    if (!user) return next();
 
     if (
       !user.lastActive ||
@@ -62,7 +63,7 @@ const updateLastActive = async (req, res, next) => {
 };
 
 const isStudent = async (req, res, next) => {
-  if (!req.user?.role === "student") {
+  if (req.user?.role !== "student") {
     return res.status(403).json({
       success: false,
       message: "Access denied: Students only",
@@ -71,7 +72,7 @@ const isStudent = async (req, res, next) => {
   next();
 };
 const isInstructor = async (req, res, next) => {
-  if (!req.user?.role === "instructor") {
+  if (req.user?.role !== "instructor") {
     return res.status(403).json({
       success: false,
       message: "Access denied: Instructor only",
@@ -80,7 +81,7 @@ const isInstructor = async (req, res, next) => {
   next();
 };
 const isAdmin = async (req, res, next) => {
-  if (!req.user?.role === "admin") {
+  if (req.user?.role !== "admin") {
     return res.status(403).json({
       success: false,
       message: "Access denied: Admin only",

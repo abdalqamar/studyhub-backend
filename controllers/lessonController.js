@@ -7,7 +7,7 @@ import {
 import Course from "../models/courseModal.js";
 
 // For creating lectures
-const createLesson = async (req, res) => {
+const createLesson = async (req, res, next) => {
   try {
     const { title, description } = req.body;
     const { courseId, sectionId } = req.params;
@@ -70,16 +70,11 @@ const createLesson = async (req, res) => {
       newLesson: lesson,
     });
   } catch (error) {
-    console.error(" Error creating lesson:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create lesson",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const updateLesson = async (req, res) => {
+const updateLesson = async (req, res, next) => {
   try {
     const { title, description } = req.body;
     const { sectionId, lessonId } = req.params;
@@ -163,16 +158,11 @@ const updateLesson = async (req, res) => {
       updatedLesson,
     });
   } catch (error) {
-    console.error("Error updating lesson:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update lesson",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
-const deleteLesson = async (req, res) => {
+const deleteLesson = async (req, res, next) => {
   try {
     const { sectionId, lessonId } = req.params;
 
@@ -218,12 +208,7 @@ const deleteLesson = async (req, res) => {
       lessonId,
     });
   } catch (error) {
-    console.error("Error deleting lesson:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong while deleting lesson",
-      error: error.message,
-    });
+    return next(error);
   }
 };
 
