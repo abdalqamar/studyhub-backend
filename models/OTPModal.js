@@ -18,22 +18,8 @@ const otpSchema = new mongoose.Schema(
       index: { expires: 0 },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
-
-otpSchema.pre("save", async function (next) {
-  try {
-    await sendEmail(
-      this.email,
-      "Varification Email from StudyHub",
-      emailVerificationTemplate(this.otp)
-    );
-    next();
-  } catch (error) {
-    console.log("error in Otp Pre middleware Scheema");
-    next();
-  }
-});
 
 const OTP = mongoose.model("OTP", otpSchema);
 export default OTP;

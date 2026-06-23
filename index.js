@@ -27,13 +27,16 @@ const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   handler: (req, res) => {
-    return res.status(429).set("Content-Type", "application/problem+json").json({
-      type: "https://httpstatuses.com/429",
-      title: "Too Many Requests",
-      status: 429,
-      detail: "Too many requests, please try again after 15 minutes",
-      instance: req.originalUrl,
-    });
+    return res
+      .status(429)
+      .set("Content-Type", "application/problem+json")
+      .json({
+        type: "https://httpstatuses.com/429",
+        title: "Too Many Requests",
+        status: 429,
+        detail: "Too many requests, please try again after 15 minutes",
+        instance: req.originalUrl,
+      });
   },
 });
 
@@ -72,7 +75,7 @@ app.get("/health", async (_, res) => {
   res.status(healthy ? 200 : 503).json({ healthy, dbState: state });
 });
 
-// Not found handler (RFC7807-ready)
+// Not found handler
 app.use((req, res, next) => {
   next({
     status: 404,
@@ -102,46 +105,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-// Graceful shutdown
-const shutdown = (signal) => {
-  console.log(`Received ${signal}. Shutting down server...`);
-  if (server) {
-    try {
-      server.close(async (err) => {
-        if (err) {
-          console.error("Error closing server:", err);
-        }
-        try {
-          await mongoose.disconnect();
-          console.log("MongoDB disconnected");
-        } catch (e) {
-          console.error("Error during MongoDB disconnect:", e);
-        }
-        process.exit(0);
-      });
-    } catch (closeErr) {
-      console.error("Error closing server:", closeErr);
-      mongoose
-        .disconnect()
-        .then(() => console.log("MongoDB disconnected"))
-        .catch((e) => console.error("Error during MongoDB disconnect:", e))
-        .finally(() => process.exit(0));
-    }
-  } else {
-    process.exit(0);
-  }
-};
-
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
-  shutdown("unhandledRejection");
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-  shutdown("uncaughtException");
-});

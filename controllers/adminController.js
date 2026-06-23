@@ -61,7 +61,6 @@ const getAdminUsers = async (req, res, next) => {
 
     const matchQuery = {};
 
-    // Filters
     if (role) matchQuery.role = role;
     if (status) matchQuery.status = status;
 
@@ -76,7 +75,6 @@ const getAdminUsers = async (req, res, next) => {
     if (role === "instructor") {
       const users = await User.aggregate([
         { $match: matchQuery },
-
         {
           $lookup: {
             from: "profiles",
@@ -91,8 +89,6 @@ const getAdminUsers = async (req, res, next) => {
             preserveNullAndEmptyArrays: true,
           },
         },
-
-        // Courses created
         {
           $lookup: {
             from: "courses",
@@ -101,7 +97,6 @@ const getAdminUsers = async (req, res, next) => {
             as: "courses",
           },
         },
-
         {
           $addFields: {
             coursesCreated: { $size: "$courses" },
@@ -120,7 +115,6 @@ const getAdminUsers = async (req, res, next) => {
             },
           },
         },
-
         {
           $project: {
             _id: 1,
@@ -136,7 +130,6 @@ const getAdminUsers = async (req, res, next) => {
             profileImage: "$profile.profileImage",
           },
         },
-
         { $sort: { createdAt: -1 } },
         { $skip: skip },
         { $limit: Number(limit) },
@@ -219,7 +212,6 @@ const deleteUserByAdmin = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // admin only
     if (req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
@@ -227,7 +219,6 @@ const deleteUserByAdmin = async (req, res, next) => {
       });
     }
 
-    //  find user
     const user = await User.findById(id);
 
     if (!user) {
@@ -250,7 +241,7 @@ const deleteUserByAdmin = async (req, res, next) => {
       await Profile.findByIdAndDelete(user.additionalInformation);
     }
 
-    //  remove user from enrolled courses
+    // remove user from enrolled courses
     if (user.enrolledCourses?.length > 0) {
       await Course.updateMany(
         { _id: { $in: user.enrolledCourses } },
@@ -258,7 +249,6 @@ const deleteUserByAdmin = async (req, res, next) => {
       );
     }
 
-    //  delete user
     await User.findByIdAndDelete(id);
 
     return res.status(200).json({
@@ -272,6 +262,8 @@ const deleteUserByAdmin = async (req, res, next) => {
 
 const getAdminDashboard = async (req, res, next) => {
   try {
+    const currentYear = new Date().getFullYear();
+
     const [
       totalRevenue,
       totalStudents,
@@ -284,22 +276,22 @@ const getAdminDashboard = async (req, res, next) => {
       monthlyInstructors,
       newEnrollments,
     ] = await Promise.all([
-      //  Total revenue
+      // Total revenue
       Payment.aggregate([
         { $match: { status: "success" } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
 
-      //  Total students
+      // Total students
       User.countDocuments({ role: "student" }),
 
-      //  Total instructors
+      // Total instructors
       User.countDocuments({ role: "instructor" }),
 
-      //  Total courses
+      // Total courses
       Course.countDocuments(),
 
-      //  Monthly revenue
+      // Monthly revenue
       Payment.aggregate([
         { $match: { status: "success" } },
         {
@@ -314,7 +306,7 @@ const getAdminDashboard = async (req, res, next) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      //  Top instructors by earnings
+      // Top instructors by earnings
       Payment.aggregate([
         { $match: { status: "success" } },
         { $group: { _id: "$instructor", total: { $sum: "$amount" } } },
@@ -361,7 +353,7 @@ const getAdminDashboard = async (req, res, next) => {
         { $sort: { count: -1 } },
       ]),
 
-      //  Monthly students growth
+      // Monthly students growth
       User.aggregate([
         { $match: { role: "student" } },
         {
@@ -376,7 +368,7 @@ const getAdminDashboard = async (req, res, next) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      //  Monthly instructors growth
+      // Monthly instructors growth
       User.aggregate([
         { $match: { role: "instructor" } },
         {
@@ -391,14 +383,14 @@ const getAdminDashboard = async (req, res, next) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      // New enrollments per month
+      // New enrollments  dynamic year
       Payment.aggregate([
         {
           $match: {
             status: "success",
             createdAt: {
-              $gte: new Date(2026, 0, 1),
-              $lt: new Date(2027, 0, 1),
+              $gte: new Date(currentYear, 0, 1),
+              $lt: new Date(currentYear + 1, 0, 1),
             },
           },
         },
@@ -445,12 +437,10 @@ const getAdminTransactions = async (req, res, next) => {
 
     const match = {};
 
-    // status filter
     if (status !== "all") {
       match.status = status;
     }
 
-    // date fillter
     const now = new Date();
     let startDate = null;
 
@@ -478,29 +468,27 @@ const getAdminTransactions = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    // transactions
-    const transactions = await Payment.find(match)
-      .populate("user", "firstName lastName")
-      .populate("course", "title")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    const totalCount = await Payment.countDocuments(match);
-
-    // stats
-    const statsAgg = await Payment.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "success"] }, "$amount", 0],
+    const [transactions, totalCount, statsAgg] = await Promise.all([
+      Payment.find(match)
+        .populate("user", "firstName lastName")
+        .populate("course", "title")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Payment.countDocuments(match),
+      Payment.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "success"] }, "$amount", 0],
+              },
             },
           },
         },
-      },
+      ]),
     ]);
 
     return res.status(200).json({

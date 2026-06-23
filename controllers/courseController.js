@@ -40,7 +40,6 @@ const createCourse = async (req, res, next) => {
       requirements,
       instructions,
     } = req.body;
-
     // check mandatory fields
     if (
       !title?.trim() ||
@@ -137,7 +136,7 @@ const createCourse = async (req, res, next) => {
 const deleteCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
-
+    console.log(id, req.body);
     if (!id) {
       return res
         .status(400)
@@ -165,9 +164,10 @@ const deleteCourse = async (req, res, next) => {
     }
 
     // Remove from enrolled students
-    for (const userId of course.enrolledStudents) {
-      await User.findByIdAndUpdate(userId, { $pull: { enrolledCourses: id } });
-    }
+    await User.updateMany(
+      { _id: { $in: course.enrolledStudents } },
+      { $pull: { enrolledCourses: id } },
+    );
 
     // Delete sections & lessons
     for (const sectionId of course.courseContent) {
@@ -398,37 +398,29 @@ const getCourseById = async (req, res, next) => {
     const { id } = req.params;
 
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({
-        success: false,
-        message: "Invalid or missing course ID",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid or missing course ID" });
     }
 
-    // Return populated course
-    const populatedCourse = await Course.findById(id)
+    const course = await Course.findById(id)
       .populate("instructor", "firstName lastName")
-      .populate({
-        path: "courseContent",
-        populate: {
-          path: "lesson",
-        },
-      })
+      .populate({ path: "courseContent", populate: { path: "lesson" } })
       .populate("ratingAndReviews")
-      .populate("enrolledStudents")
-      .populate("category", "name");
+      .populate("category", "name")
+      .lean();
 
-    if (!populatedCourse) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
+    if (!course) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Course details fetched successfully",
-      course: populatedCourse,
-    });
+    course.enrolledCount = await User.countDocuments({ enrolledCourses: id });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Course details fetched", course });
   } catch (error) {
     return next(error);
   }

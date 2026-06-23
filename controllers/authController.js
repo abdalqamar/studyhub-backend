@@ -8,6 +8,7 @@ import OTP from "../models/OTPModal.js";
 import Profile from "../models/profileModal.js";
 import resetPasswordTemplate from "../template/resetPasswordTemplate.js";
 import passwordUpdateTemplate from "../template/passwordUpdateTemplate.js";
+import emailVerificationTemplate from "../template/emailVerificationTemplate.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -47,10 +48,14 @@ const sendOtp = async (req, res, next) => {
     }
 
     const { otp } = await generateUniqueOTP(email);
-    if (isDevelopment) {
-      console.log(`OTP for ${email}: ${otp}`);
-    }
 
+    await sendEmail(
+      email,
+      "Verification - StudyHub",
+      emailVerificationTemplate(otp),
+    );
+
+    if (isDevelopment) console.log(`OTP for ${email}: ${otp}`);
     return res
       .status(200)
       .json({ success: true, message: "OTP sent to your email" });
@@ -97,6 +102,7 @@ const register = async (req, res, next) => {
     const validOtp = await OTP.findOne({
       email: email.trim().toLowerCase(),
     }).sort({ createdAt: -1 });
+
     if (!validOtp || validOtp.otp !== otp) {
       return res
         .status(400)
@@ -212,7 +218,7 @@ const login = async (req, res, next) => {
       secure: isProd,
       sameSite: isProd ? "strict" : "lax",
       domain: isProd ? ".studyhubedu.online" : undefined,
-      path: "/",
+      path: "/refresh-token",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

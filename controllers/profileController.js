@@ -8,7 +8,6 @@ const updateProfile = async (req, res, next) => {
   try {
     const id = req.user.id;
 
-    // Destructure fields from req.body
     const { firstName, lastName, dateOfBirth, contactNumber, about, gender } =
       req.body;
 
@@ -72,7 +71,7 @@ const updateProfileImage = async (req, res, next) => {
     const { id } = req.user;
 
     const image = req.files?.profileImage?.[0] || null;
-    console.log(image);
+
     if (!image) {
       return res.status(400).json({
         success: false,
@@ -143,99 +142,66 @@ const getUserDetails = async (req, res, next) => {
 
 // For getting enrolled courses of user
 const getEnrolledCourses = async (req, res, next) => {
-  try {
-    const userId = req.user?.id;
+  const userId = req.user?.id;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+  // Ek query mein sab lo
+  const user = await User.findById(userId)
+    .populate({
+      path: "enrolledCourses",
+      populate: [
+        {
+          path: "courseContent",
+          populate: { path: "lesson", select: "title duration" },
+        },
+        { path: "instructor", select: "firstName lastName" },
+        { path: "category", select: "name" },
+      ],
+    })
+    .lean();
 
-    const user = await User.findById(userId).populate("enrolledCourses");
+  if (!user)
+    return res.status(404).json({ success: false, message: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+  const courseIds = user.enrolledCourses.map((c) => c._id);
 
-    const enrolledCourses = user.enrolledCourses;
+  // Ek query mein sab progress
+  const allProgress = await CourseProgress.find({
+    userId,
+    courseId: { $in: courseIds },
+  }).lean();
 
-    // Fetch course progress and there progress percentage
-    const coursesWithProgress = await Promise.all(
-      enrolledCourses.map(async (course) => {
-        const fullCourse = await Course.findById(course._id)
-          .populate({
-            path: "courseContent",
-            populate: {
-              path: "lesson",
-              select: "title duration",
-            },
-          })
-          .populate({
-            path: "instructor",
-            select: "firstName lastName",
-          })
-          .populate("category", "name")
-          .lean();
+  const progressMap = {};
+  allProgress.forEach((p) => {
+    progressMap[p.courseId.toString()] = p;
+  });
 
-        if (!fullCourse) return null;
-
-        const allLessons = fullCourse.courseContent.flatMap(
-          (section) => section.lesson || [],
-        );
-
-        const totalLessons = allLessons.length;
-
-        const totalMinutes = allLessons.reduce(
-          (sum, lesson) => sum + (lesson?.duration || 0),
-          0,
-        );
-
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        const totalDuration = `${hours}h ${minutes}m`;
-
-        const progress = await CourseProgress.findOne({
-          userId,
-          courseId: course._id,
-        });
-
-        const completed = progress?.completedLessons?.length || 0;
-
-        const percentage = totalLessons
-          ? Math.round((completed / totalLessons) * 100)
-          : 0;
-
-        return {
-          _id: course._id,
-          thumbnail: course.thumbnail,
-          title: course.title,
-          description: course.description,
-          progressPercentage: percentage,
-          totalDuration,
-          totalLessons,
-          category: fullCourse.category?.name || fullCourse.category,
-          instructor: `${fullCourse.instructor?.firstName || ""} ${
-            fullCourse.instructor?.lastName || ""
-          }`.trim(),
-        };
-      }),
+  const coursesWithProgress = user.enrolledCourses.map((course) => {
+    const allLessons = course.courseContent.flatMap((s) => s.lesson || []);
+    const totalLessons = allLessons.length;
+    const totalMinutes = allLessons.reduce(
+      (sum, l) => sum + (l.duration || 0),
+      0,
     );
+    const progress = progressMap[course._id.toString()];
+    const completed = progress?.completedLessons?.length || 0;
 
-    return res.status(200).json({
-      success: true,
-      message: "Enrolled courses fetched successfully",
-      courses: coursesWithProgress,
-    });
-  } catch (err) {
-    return next(err);
-  }
+    return {
+      _id: course._id,
+      title: course.title,
+      thumbnail: course.thumbnail,
+      progressPercentage: totalLessons
+        ? Math.round((completed / totalLessons) * 100)
+        : 0,
+      totalDuration: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      totalLessons,
+      category: course.category?.name || null,
+      instructor:
+        `${course.instructor?.firstName || ""} ${course.instructor?.lastName || ""}`.trim(),
+    };
+  });
+
+  return res.status(200).json({ success: true, courses: coursesWithProgress });
 };
-
 export {
   updateProfile,
   updateProfileImage,

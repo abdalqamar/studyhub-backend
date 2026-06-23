@@ -62,6 +62,16 @@ const updateLastActive = async (req, res, next) => {
   }
 };
 
+const isInstructorOrAdmin = async (req, res, next) => {
+  if (req.user?.role !== "instructor" && req.user?.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied: Instructor or Admin only",
+    });
+  }
+  next();
+};
+
 const isStudent = async (req, res, next) => {
   if (req.user?.role !== "student") {
     return res.status(403).json({
@@ -71,6 +81,7 @@ const isStudent = async (req, res, next) => {
   }
   next();
 };
+console.log("instructor se pahle");
 const isInstructor = async (req, res, next) => {
   if (req.user?.role !== "instructor") {
     return res.status(403).json({
@@ -80,6 +91,7 @@ const isInstructor = async (req, res, next) => {
   }
   next();
 };
+console.log("instructor ke baad");
 const isAdmin = async (req, res, next) => {
   if (req.user?.role !== "admin") {
     return res.status(403).json({
@@ -90,4 +102,13 @@ const isAdmin = async (req, res, next) => {
   next();
 };
 
-export { isAuthenticated, isStudent, isInstructor, isAdmin, updateLastActive };
+console.log("admin ke baad");
+
+export {
+  isAuthenticated,
+  isStudent,
+  isInstructor,
+  isAdmin,
+  isInstructorOrAdmin,
+  updateLastActive,
+};
