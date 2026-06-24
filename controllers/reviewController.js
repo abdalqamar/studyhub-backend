@@ -147,6 +147,47 @@ const deleteReview = async (req, res, next) => {
 };
 
 // update review controller
-const updateReview = async (req, res, next) => {};
+const updateReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rating, review } = req.body;
+    const userId = req.user.id;
+
+    if (rating && (rating < 1 || rating > 5)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Rating must be between 1 and 5" });
+    }
+
+    const existingReview = await RatingAndReviews.findOne({
+      _id: id,
+      user: userId,
+    });
+    if (!existingReview) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Review not found" });
+    }
+
+    if (rating) existingReview.rating = rating;
+    if (review) existingReview.review = review;
+    await existingReview.save();
+
+    const avgResult = await RatingAndReviews.aggregate([
+      { $match: { course: existingReview.course } },
+      { $group: { _id: null, averageRating: { $avg: "$rating" } } },
+    ]);
+
+    await Course.findByIdAndUpdate(existingReview.course, {
+      averageRating: avgResult[0]?.averageRating?.toFixed(1) || 0,
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Review updated", data: existingReview });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export { createReview, updateReview, deleteReview };

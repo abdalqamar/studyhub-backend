@@ -14,16 +14,13 @@ const router = express.Router();
 
 router.use(isAuthenticated, updateLastActive);
 
-router.put("/update-profile", isAuthenticated, updateProfile);
-
+router.put("/update-profile", updateProfile);
 router.put(
   "/update-photo",
   upload.fields([{ name: "profileImage", maxCount: 1 }]),
-  isAuthenticated,
-  updateProfileImage
+  updateProfileImage,
 );
-
-router.get("/enrolled-courses", isAuthenticated, getEnrolledCourses);
-router.get("/:id", isAuthenticated, getUserDetails);
+router.get("/enrolled-courses", getEnrolledCourses);
+router.get("/:id", getUserDetails);
 
 export default router;

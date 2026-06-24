@@ -8,6 +8,7 @@ import OTP from "../models/OTPModal.js";
 import Profile from "../models/profileModal.js";
 import resetPasswordTemplate from "../template/resetPasswordTemplate.js";
 import passwordUpdateTemplate from "../template/passwordUpdateTemplate.js";
+import emailVerificationTemplate from "../template/emailVerificationTemplate.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -47,6 +48,12 @@ const sendOtp = async (req, res, next) => {
     }
 
     const { otp } = await generateUniqueOTP(email);
+    await sendEmail(
+      email,
+      "Verification Email from StudyHub",
+      emailVerificationTemplate(otp),
+    );
+
     if (isDevelopment) {
       console.log(`OTP for ${email}: ${otp}`);
     }
