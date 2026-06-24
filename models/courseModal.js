@@ -72,7 +72,14 @@ const courseSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
+
+courseSchema.index({ status: 1 });
+courseSchema.index({ status: 1, category: 1 });
+courseSchema.index({ instructor: 1 });
+courseSchema.index({ title: "text", description: "text" });
+courseSchema.index({ createdAt: -1 });
+
 const Course = mongoose.model("Course", courseSchema);
 export default Course;

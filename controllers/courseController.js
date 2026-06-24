@@ -165,9 +165,10 @@ const deleteCourse = async (req, res, next) => {
     }
 
     // Remove from enrolled students
-    for (const userId of course.enrolledStudents) {
-      await User.findByIdAndUpdate(userId, { $pull: { enrolledCourses: id } });
-    }
+    await User.updateMany(
+      { _id: { $in: course.enrolledStudents } },
+      { $pull: { enrolledCourses: id } },
+    );
 
     // Delete sections & lessons
     for (const sectionId of course.courseContent) {
