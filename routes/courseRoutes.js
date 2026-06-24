@@ -3,8 +3,7 @@ const router = express.Router();
 
 import upload from "../utils/multer.js";
 
-// CONTROLLERS
-
+// Controllers
 import {
   createCourse,
   deleteCourse,
@@ -35,40 +34,32 @@ import {
   updateLesson,
 } from "../controllers/lessonController.js";
 
-// MIDDLEWARE
-
+// Middleware
 import {
   isAuthenticated,
   isInstructor,
+  isInstructorOrAdmin,
   isStudent,
 } from "../middleware/authMiddleware.js";
 
-// PUBLIC ROUTES (NO AUTH)
-
-// Public courses (approved only + filters)
+// Public routes
 router.get("/", getPublicCourses);
 
-// ADMIN / INSTRUCTOR DASHBOARD
+// Static routes
 router.get("/manage", isAuthenticated, fetchAllCourses);
+router.get("/edit/:id", isAuthenticated, isInstructor, getCourseById);
 
-//  COURSE VIEW ROUTES
-
-// Course preview (logged-in users)
+// Dynamic routes
 router.get("/:id/preview", isAuthenticated, getCoursePreview);
-
-// Student enrolled course content
 router.get("/:id/content", isAuthenticated, isStudent, getCourseContent);
-
-// Public course details (KEEP AFTER /manage)
 router.get("/:id", getCourseDetails);
 
-//  REVIEWS
-router.put("/:id/reviews", isAuthenticated, updateReview);
-router.delete("/:id/reviews", deleteReview);
+// Review routes
 router.post("/:id/reviews", isAuthenticated, createReview);
+router.put("/:id/reviews", isAuthenticated, updateReview);
+router.delete("/:id/reviews", isAuthenticated, deleteReview);
 
-// INSTRUCTOR COURSE CRUD ROUTES
-// Create course
+// Course routes
 router.post(
   "/",
   isAuthenticated,
@@ -77,22 +68,17 @@ router.post(
   createCourse,
 );
 
-// Update course
 router.put(
   "/:id",
   isAuthenticated,
-  isInstructor,
+  isInstructorOrAdmin,
   upload.fields([{ name: "courseThumbnail", maxCount: 1 }]),
   updateCourse,
 );
 
-// Delete course
-router.delete("/:id", isAuthenticated, isInstructor, deleteCourse);
+router.delete("/:id", isAuthenticated, isInstructorOrAdmin, deleteCourse);
 
-// Get course for editing
-router.get("/edit/:id", isAuthenticated, isInstructor, getCourseById);
-
-// SECTIONS
+// Section routes
 router.post(
   "/:courseId/sections",
   isAuthenticated,
@@ -114,8 +100,7 @@ router.delete(
   deleteSection,
 );
 
-//  LESSONS
-
+// Lesson routes
 router.post(
   "/:courseId/sections/:sectionId/lessons",
   isAuthenticated,
@@ -125,7 +110,7 @@ router.post(
 );
 
 router.put(
-  "/sections/:sectionId/lessons/:lessonId",
+  "/:courseId/sections/:sectionId/lessons/:lessonId",
   isAuthenticated,
   isInstructor,
   upload.fields([{ name: "videoFile", maxCount: 1 }]),
@@ -133,7 +118,7 @@ router.put(
 );
 
 router.delete(
-  "/:sectionId/lessons/:lessonId",
+  "/:courseId/sections/:sectionId/lessons/:lessonId",
   isAuthenticated,
   isInstructor,
   deleteLesson,
