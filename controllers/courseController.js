@@ -398,37 +398,29 @@ const getCourseById = async (req, res, next) => {
     const { id } = req.params;
 
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({
-        success: false,
-        message: "Invalid or missing course ID",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid or missing course ID" });
     }
 
-    // Return populated course
-    const populatedCourse = await Course.findById(id)
+    const course = await Course.findById(id)
       .populate("instructor", "firstName lastName")
-      .populate({
-        path: "courseContent",
-        populate: {
-          path: "lesson",
-        },
-      })
+      .populate({ path: "courseContent", populate: { path: "lesson" } })
       .populate("ratingAndReviews")
-      .populate("enrolledStudents")
-      .populate("category", "name");
+      .populate("category", "name")
+      .lean();
 
-    if (!populatedCourse) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
+    if (!course) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Course details fetched successfully",
-      course: populatedCourse,
-    });
+    course.enrolledCount = await User.countDocuments({ enrolledCourses: id });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Course details fetched", course });
   } catch (error) {
     return next(error);
   }

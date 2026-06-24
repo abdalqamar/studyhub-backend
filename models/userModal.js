@@ -71,7 +71,6 @@ const userSchema = new mongoose.Schema(
         createdAt: {
           type: Date,
           default: Date.now,
-          expires: 7 * 24 * 60 * 60,
         },
       },
     ],
@@ -79,43 +78,9 @@ const userSchema = new mongoose.Schema(
       token: { type: String },
       expires: { type: Date },
     },
-    quizAttempts: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "QuizAttempt",
-      },
-    ],
-    quizResults: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "QuizResult",
-      },
-    ],
-    quizStats: {
-      totalQuizzesTaken: {
-        type: Number,
-        default: 0,
-      },
-      totalQuizzesPassed: {
-        type: Number,
-        default: 0,
-      },
-      averageScore: {
-        type: Number,
-        default: 0,
-      },
-      bestScore: {
-        type: Number,
-        default: 0,
-      },
-      totalTimeSpent: {
-        type: Number,
-        default: 0,
-      },
-    },
   },
 
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.pre("save", async function (next) {

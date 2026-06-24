@@ -62,6 +62,16 @@ const updateLastActive = async (req, res, next) => {
   }
 };
 
+const isInstructorOrAdmin = (req, res, next) => {
+  if (req.user?.role !== "instructor" && req.user?.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied: Instructor or Admin only",
+    });
+  }
+  next();
+};
+
 const isStudent = async (req, res, next) => {
   if (req.user?.role !== "student") {
     return res.status(403).json({
@@ -90,4 +100,11 @@ const isAdmin = async (req, res, next) => {
   next();
 };
 
-export { isAuthenticated, isStudent, isInstructor, isAdmin, updateLastActive };
+export {
+  isAuthenticated,
+  isStudent,
+  isInstructor,
+  isAdmin,
+  isInstructorOrAdmin,
+  updateLastActive,
+};
