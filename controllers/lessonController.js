@@ -5,6 +5,22 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import Course from "../models/courseModal.js";
+import { calculateLessonStats } from "../utils/calculateLessonStats.js";
+
+const updateCourseTotals = async (courseId) => {
+  const course = await Course.findById(courseId).populate({
+    path: "courseContent",
+    populate: { path: "lesson", select: "duration" },
+  });
+
+  const lessons = course.courseContent.flatMap((s) => s.lesson || []);
+  const { hours, minutes } = calculateLessonStats(lessons);
+
+  await Course.findByIdAndUpdate(courseId, {
+    totalLessons: lessons.length,
+    totalDuration: `${hours}h ${minutes}m`,
+  });
+};
 
 // For creating lectures
 const createLesson = async (req, res, next) => {
@@ -63,6 +79,8 @@ const createLesson = async (req, res, next) => {
       { $push: { lesson: lesson._id } },
       { new: true },
     ).populate("lesson");
+
+    await updateCourseTotals(courseId);
 
     return res.status(201).json({
       success: true,
@@ -164,12 +182,12 @@ const updateLesson = async (req, res, next) => {
 
 const deleteLesson = async (req, res, next) => {
   try {
-    const { sectionId, lessonId } = req.params;
+    const { courseId, sectionId, lessonId } = req.params;
 
-    if (!lessonId || !sectionId) {
+    if (!lessonId || !sectionId || !courseId) {
       return res.status(400).json({
         success: false,
-        message: "lessonId and sectionId are required",
+        message: "lessonId, sectionId, and courseId are required",
       });
     }
 
@@ -199,6 +217,8 @@ const deleteLesson = async (req, res, next) => {
 
     // Delete lesson from database
     await Lesson.findByIdAndDelete(lessonId);
+
+    await updateCourseTotals(courseId);
 
     // Return  response
     return res.status(200).json({

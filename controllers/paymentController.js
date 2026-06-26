@@ -151,7 +151,10 @@ const enrollStudent = async (payment) => {
       ),
     ),
   ]);
-
+  await Course.updateMany(
+    { _id: { $in: newIds } },
+    { $inc: { totalStudentsCount: 1 } },
+  );
   return { alreadyEnrolled: false, enrolledTitles: titles, userId };
 };
 

@@ -19,6 +19,13 @@ const validatePassword = (password) =>
     password || "",
   );
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  path: "/",
+};
+
 const sendOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -213,13 +220,8 @@ const login = async (req, res, next) => {
       },
     ]);
 
-    const isProd = process.env.NODE_ENV === "production";
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
-      domain: isProd ? ".studyhubedu.online" : undefined,
-      path: "/",
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -252,9 +254,7 @@ const logout = async (req, res, next) => {
     }
 
     res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      ...cookieOptions,
     });
 
     return res
@@ -398,11 +398,7 @@ const changePassword = async (req, res, next) => {
       passwordUpdateTemplate(user.email, user.firstName),
     );
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-    });
+    res.clearCookie("refreshToken", cookieOptions);
 
     return res.status(200).json({
       success: true,
@@ -424,14 +420,20 @@ const refreshToken = async (req, res, next) => {
     let decoded;
     try {
       decoded = jwt.verify(refreshTokenCookie, process.env.JWT_REFRESH_SECRET);
-    } catch {
-      res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+    } catch (err) {
+      res.clearCookie("refreshToken", cookieOptions);
+
+      return res.status(401).json({
+        success: false,
+        message:
+          err.name === "TokenExpiredError"
+            ? "Session expired, please login again"
+            : "Invalid refresh token",
+        code:
+          err.name === "TokenExpiredError"
+            ? "SESSION_EXPIRED"
+            : "INVALID_TOKEN",
       });
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid or expired refresh token" });
     }
 
     const user = await User.findById(decoded.id);
@@ -488,11 +490,7 @@ const refreshToken = async (req, res, next) => {
 
     const isProd = process.env.NODE_ENV === "production";
     res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
-      domain: isProd ? ".studyhubedu.online" : undefined,
-      path: "/",
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

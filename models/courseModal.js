@@ -71,7 +71,11 @@ const courseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    totalLessons: { type: Number, default: 0 },
+    totalDuration: { type: String, default: "0h 0m" },
+    totalStudentsCount: { type: Number, default: 0 },
   },
+
   { timestamps: true },
 );
 

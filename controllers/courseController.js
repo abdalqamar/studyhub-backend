@@ -9,17 +9,10 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
+import { calculateLessonStats } from "../utils/calculateLessonStats.js";
 
 // Environment & Constants
 const isDevelopment = process.env.NODE_ENV !== "production";
-
-// Helper to calculate lesson duration and total minutes
-const calculateLessonStats = (lessons = []) => {
-  const totalMinutes = lessons.reduce((sum, l) => sum + (l.duration || 0), 0);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return { totalMinutes, hours, minutes };
-};
 
 const createCourse = async (req, res, next) => {
   try {
@@ -196,65 +189,43 @@ const deleteCourse = async (req, res, next) => {
 const getPublicCourses = async (req, res, next) => {
   try {
     const { search, category, page = 1, limit = 12 } = req.query;
-
     const skip = (Number(page) - 1) * Number(limit);
 
-    const matchQuery = {
-      status: "approved",
-    };
-
-    if (category) {
-      matchQuery.category = category;
-    }
-
-    if (search) {
-      matchQuery.title = { $regex: search, $options: "i" };
-    }
+    const matchQuery = { status: "approved" };
+    if (category) matchQuery.category = category;
+    if (search) matchQuery.title = { $regex: search, $options: "i" };
 
     const [courses, total] = await Promise.all([
       Course.find(matchQuery)
         .populate("category", "name")
         .populate("instructor", "firstName lastName")
-        .populate({
-          path: "courseContent",
-          populate: {
-            path: "lesson",
-            select: "duration",
-          },
-        })
+        .select(
+          "-courseContent -ratingAndReviews -benefits -requirements -tags -enrolledStudents",
+        )
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .lean(),
-
       Course.countDocuments(matchQuery),
     ]);
 
-    const formattedCourses = courses.map((course) => {
-      const lessons = course.courseContent.flatMap((sec) => sec.lesson || []);
-      const { hours, minutes } = calculateLessonStats(lessons);
-
-      return {
-        _id: course._id,
-        title: course.title,
-        description: course.description,
-        thumbnail: course.thumbnail,
-        price: course.price,
-        discountPrice: course.discountPrice ?? null,
-        averageRating: course.averageRating || 0,
-        enrolledStudents: course.enrolledStudents?.length || 0,
-        category: course.category?.name || null,
-        instructor: `${course.instructor?.firstName || ""} ${
-          course.instructor?.lastName || ""
-        }`.trim(),
-        totalLectures: lessons.length,
-        totalDuration: `${hours}h ${minutes}m`,
-      };
-    });
+    const formattedCourses = courses.map((course) => ({
+      _id: course._id,
+      title: course.title,
+      description: course.description,
+      thumbnail: course.thumbnail,
+      price: course.price,
+      discountPrice: course.discountPrice ?? null,
+      averageRating: course.averageRating || 0,
+      enrolledStudents: course.totalStudentsCount || 0,
+      category: course.category || null,
+      instructor: course.instructor || null,
+      totalLectures: course.totalLessons || 0,
+      totalDuration: course.totalDuration || "0h 0m",
+    }));
 
     return res.status(200).json({
       success: true,
-      message: "Courses fetched successfully",
       courses: formattedCourses,
       pagination: {
         total,
@@ -568,7 +539,7 @@ const getCoursePreview = async (req, res, next) => {
         thumbnail: course.thumbnail,
         averageRating,
         totalStudents: course.enrolledStudents?.length || 0,
-        totalLectures: allLessons.length,
+        totalLectures: lessons.length,
         totalDuration: `${hours}h ${minutes}m`,
         status: course.status,
         createdAt: course.createdAt,
@@ -626,12 +597,12 @@ const getCourseDetails = async (req, res, next) => {
     }
 
     // Extract lessons
-    const allLessons = course.courseContent.flatMap(
+    const lessons = course.courseContent.flatMap(
       (section) => section.lesson || [],
     );
 
     // Total duration
-    const { hours, minutes } = calculateLessonStats(allLessons);
+    const { hours, minutes } = calculateLessonStats(lessons);
 
     const formattedReviews = course.ratingAndReviews.map((r) => ({
       _id: r._id,
@@ -660,7 +631,7 @@ const getCourseDetails = async (req, res, next) => {
         thumbnail: course.thumbnail,
         averageRating: course.averageRating || 0,
         totalStudents: course.enrolledStudents?.length || 0,
-        totalLectures: allLessons.length,
+        totalLectures: lessons.length,
         totalDuration: `${hours}h ${minutes}m`,
         instructor: course.instructor,
         curriculum: course.courseContent,
