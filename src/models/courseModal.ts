@@ -1,0 +1,91 @@
+import mongoose from "mongoose";
+import { ICourse } from "../types/course.types.js";
+
+const courseSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+    },
+
+    description: {
+      type: String,
+      required: true,
+    },
+    instructor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    whatYouWillLearn: [String],
+    courseContent: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Section",
+      },
+    ],
+    ratingAndReviews: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "RatingAndReviews",
+      },
+    ],
+    price: {
+      type: Number,
+      required: true,
+    },
+    thumbnail: {
+      type: String,
+      required: true,
+    },
+    thumbnailPublicId: {
+      type: String,
+    },
+    tags: [
+      {
+        type: String,
+      },
+    ],
+    instructions: [String],
+
+    requirements: [String],
+    enrolledStudents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    status: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "draft",
+    },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
+    },
+    feedback: {
+      type: String,
+      default: "",
+    },
+    averageRating: {
+      type: Number,
+      default: 0,
+    },
+    totalLessons: { type: Number, default: 0 },
+    totalDuration: { type: String, default: "0h 0m" },
+    totalStudentsCount: { type: Number, default: 0 },
+  },
+
+  { timestamps: true },
+);
+
+courseSchema.index({ status: 1 });
+courseSchema.index({ status: 1, category: 1 });
+courseSchema.index({ instructor: 1 });
+courseSchema.index({ title: "text", description: "text" });
+courseSchema.index({ createdAt: -1 });
+
+const Course = mongoose.model<ICourse>("Course", courseSchema);
+export default Course;
