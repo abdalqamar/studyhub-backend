@@ -79,11 +79,10 @@ export const sendOtp = async (
   res: Response,
   next: NextFunction,
 ) => {
-  console.log("=== SEND OTP HIT ===", JSON.stringify(req.body));
   try {
     const { firstName, lastName, email, password, confirmPassword } = req.body;
 
-    if (!firstName || !email || !password)
+    if (!firstName || !email || !password || !confirmPassword)
       return next(new AppError(400, "All fields are required"));
     if (!validateEmail(email))
       return next(new AppError(400, "Valid email is required"));
@@ -124,7 +123,7 @@ export const sendOtp = async (
       },
       { upsert: true, new: true },
     );
-    console.log("Pending:", pending);
+
     const { otp } = await generateUniqueOTP(email);
     await sendEmail(
       email,
@@ -133,7 +132,7 @@ export const sendOtp = async (
     );
 
     if (isDevelopment) console.log(`OTP for ${email}: ${otp}`);
-    console.log("Otp is ", otp);
+
     return sendSuccess(res, 200, "OTP sent to your email");
   } catch (error) {
     return next(error);

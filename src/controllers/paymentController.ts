@@ -308,8 +308,15 @@ export const razorpayWebhook = async (
         paymentGatewayOrderId: payment.order_id,
       }));
 
-      await Payment.insertMany(paymentDocs, { session, ordered: true });
-
+      try {
+        await Payment.insertMany(paymentDocs, { session, ordered: true });
+      } catch (err: any) {
+        if (err.code === 11000) {
+          await session.abortTransaction();
+          return res.status(200).json({ success: true });
+        }
+        throw err;
+      }
       const { alreadyEnrolled, enrolledTitles } = await enrollStudent(
         notes,
         courses,
