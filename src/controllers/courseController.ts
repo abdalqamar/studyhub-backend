@@ -1,5 +1,5 @@
-import Course from "../models/courseModal.js";
-import CourseProgress from "../models/courseProgressModal.js";
+import Course from "../models/course.model.js";
+import CourseProgress from "../models/courseProgress.model.js";
 import { escapeRegex } from "../utils/escapeRegex.js";
 import { calculateLessonStats } from "../utils/calculateLessonStats.js";
 import { sendSuccess } from "../utils/response.js";

@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import Course from "../models/courseModal.js";
-import RatingAndReviews from "../models/ratingAndRewiews.js";
+import Course from "../models/course.model.js";
+import RatingAndReviews from "../models/ratingAndReviews.model.js";
 import { AppError } from "../utils/AppError.js";
 import { sendSuccess } from "../utils/response.js";
 import { Request, Response, NextFunction } from "express";

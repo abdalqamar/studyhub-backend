@@ -1,4 +1,4 @@
-import Category from "../models/categoryModal.js";
+import Category from "../models/category.model.js";
 import { Request, Response, NextFunction } from "express";
 import { sendSuccess, sendError } from "../utils/response.js";
 import * as categoryService from "../services/categoryService.js";

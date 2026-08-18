@@ -1,5 +1,5 @@
-import Course from "../models/courseModal.js";
-import User from "../models/userModal.js";
+import Course from "../models/course.model.js";
+import User from "../models/user.model.js";
 import { IProfile } from "../types/profile.types.js";
 import { AppError } from "../utils/AppError.js";
 import { escapeRegex } from "../utils/escapeRegex.js";

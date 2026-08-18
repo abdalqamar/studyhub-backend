@@ -1,4 +1,4 @@
-import Course from "../models/courseModal.js";
+import Course from "../models/course.model.js";
 import { TokenPayload } from "../types/auth.types.js";
 
 type OwnershipCheckResult =

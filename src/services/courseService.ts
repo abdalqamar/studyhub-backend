@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
-import Category from "../models/categoryModal.js";
-import Course from "../models/courseModal.js";
-import Section from "../models/sectionModal.js";
-import Lesson from "../models/lessonModal.js";
-import User from "../models/userModal.js";
+import Category from "../models/category.model.js";
+import Course from "../models/course.model.js";
+import Section from "../models/section.model.js";
+import Lesson from "../models/lesson.model.js";
+import User from "../models/user.model.js";
 import {
   uploadWithRollback,
   deleteFromCloudinary,
@@ -15,7 +15,7 @@ import {
   UpdateCourseDTO,
 } from "../types/course.types.js";
 import { TokenPayload } from "../types/auth.types.js";
-import CourseProgress from "../models/courseProgressModal.js";
+import CourseProgress from "../models/courseProgress.model.js";
 
 //  Create
 export const createCourse = async (

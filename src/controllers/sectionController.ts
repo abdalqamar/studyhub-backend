@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import Section from "../models/sectionModal.js";
-import Course from "../models/courseModal.js";
-import Lesson from "../models/lessonModal.js";
+import Section from "../models/section.model.js";
+import Course from "../models/course.model.js";
+import Lesson from "../models/lesson.model.js";
 import { verifyCourseOwnership } from "../utils/verifyCourseOwnership.js";
 import { AppError } from "../utils/AppError.js";
 import { sendSuccess } from "../utils/response.js";

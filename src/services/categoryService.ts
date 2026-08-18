@@ -1,4 +1,4 @@
-import Category from "../models/categoryModal.js";
+import Category from "../models/category.model.js";
 import {
   uploadWithRollback,
   deleteFromCloudinary,

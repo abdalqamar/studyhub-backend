@@ -1,5 +1,5 @@
 import mongoose, { Types } from "mongoose";
-import RatingAndReviews from "../models/ratingAndRewiews.js";
+import RatingAndReviews from "../models/ratingAndReviews.model.js";
 
 export const calculateAverageRating = async (courseId: string) => {
   const result = await RatingAndReviews.aggregate([

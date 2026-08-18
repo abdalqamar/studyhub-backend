@@ -1,4 +1,4 @@
-import OTP from "../models/OTPModal.js";
+import OTP from "../models/otp.model.js";
 import otpGenerator from "otp-generator";
 
 const isDevelopment = process.env.NODE_ENV !== "production";

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import CourseProgress from "../models/courseProgressModal.js";
+import CourseProgress from "../models/courseProgress.model.js";
 import { AppError } from "../utils/AppError.js";
 import { sendSuccess } from "../utils/response.js";
 import { Request, Response, NextFunction } from "express";

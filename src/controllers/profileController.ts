@@ -1,5 +1,5 @@
-import User from "../models/userModal.js";
-import CourseProgress from "../models/courseProgressModal.js";
+import User from "../models/user.model.js";
+import CourseProgress from "../models/courseProgress.model.js";
 import { sendSuccess } from "../utils/response.js";
 import * as profileService from "../services/profileService.js";
 import { Request, Response, NextFunction } from "express";

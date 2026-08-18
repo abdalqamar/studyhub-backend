@@ -1,14 +1,14 @@
-import Course from "../models/courseModal.js";
+import Course from "../models/course.model.js";
 import { Request, Response, NextFunction } from "express";
-import User from "../models/userModal.js";
-import Profile from "../models/profileModal.js";
-import Payment from "../models/payment.modal.js";
+import User from "../models/user.model.js";
+import Profile from "../models/profile.model.js";
+import Payment from "../models/payment.model.js";
 import { escapeRegex } from "../utils/escapeRegex.js";
 import { AppError } from "../utils/AppError.js";
 import { sendSuccess } from "../utils/response.js";
 import { IProfile } from "../types/profile.types.js";
 import mongoose from "mongoose";
-import CourseProgress from "../models/courseProgressModal.js";
+import CourseProgress from "../models/courseProgress.model.js";
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 12;

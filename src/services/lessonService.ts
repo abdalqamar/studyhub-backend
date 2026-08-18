@@ -1,6 +1,6 @@
-import Section from "../models/sectionModal.js";
-import Lesson from "../models/lessonModal.js";
-import Course from "../models/courseModal.js";
+import Section from "../models/section.model.js";
+import Lesson from "../models/lesson.model.js";
+import Course from "../models/course.model.js";
 import {
   uploadWithRollback,
   deleteFromCloudinary,

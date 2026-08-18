@@ -1,5 +1,4 @@
 import jwt from "jsonwebtoken";
-import User from "../models/userModal.js";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/AppError.js";
 import { sendError } from "../utils/response.js";
